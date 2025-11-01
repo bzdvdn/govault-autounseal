@@ -11,8 +11,19 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
 
 ### Installation
 
+#### Option 1: Build from source
+
 1. Clone the repository
 2. Run `go build` to compile the binary
+3. Copy `config.example.yaml` to `config.yaml` and modify as needed
+
+#### Option 2: Docker
+
+1. Clone the repository
+2. Build the Docker image:
+   ```bash
+   docker build -t govault-autounseal .
+   ```
 3. Copy `config.example.yaml` to `config.yaml` and modify as needed
 
 ### Configuration
@@ -40,18 +51,20 @@ The application can be configured via:
    ```
 
 2. **Environment Variables**:
-   - `VAULT_WAIT_INTERVAL`
-   - `VAULT_SECRET_KEY`
-   - `VAULT_SECRET_SALT`
-   - `VAULT_KUBE_ENABLED`
-   - `VAULT_KUBE_NAMESPACE`
-   - `VAULT_KUBE_LABEL_SELECTOR`
-   - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
-   - `VAULT_KUBE_POD_SCAN_DELAY`
-   - `VAULT_HTTP_ENABLED`
-   - `VAULT_HTTP_URLS`
-   - `VAULT_HTTP_USERNAME`
-   - `VAULT_HTTP_PASSWORD`
+    - `VAULT_WAIT_INTERVAL`
+    - `VAULT_SECRET_KEY`
+    - `VAULT_SECRET_SALT`
+    - `VAULT_KUBE_ENABLED`
+    - `VAULT_KUBE_NAMESPACE`
+    - `VAULT_KUBE_LABEL_SELECTOR`
+    - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
+    - `VAULT_KUBE_POD_SCAN_DELAY`
+    - `VAULT_KUBE_SECRET_NAME`
+    - `VAULT_KUBE_SECRET_NAMESPACE`
+    - `VAULT_HTTP_ENABLED`
+    - `VAULT_HTTP_URLS`
+    - `VAULT_HTTP_USERNAME`
+    - `VAULT_HTTP_PASSWORD`
 
 ### Usage
 
@@ -72,6 +85,28 @@ This will output an encrypted string containing your unseal keys.
 ```
 
 #### Run the Autounseal Service
+
+##### Using Docker
+
+For Kubernetes mode, create a secret with the encrypted keys:
+
+```bash
+kubectl create secret generic vault-unseal-keys --from-literal=encrypted-keys="your-encrypted-keys" -n vault
+```
+
+Then run the service with Docker:
+
+```bash
+docker run -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
+```
+
+For HTTP mode, set the encrypted keys as an environment variable:
+
+```bash
+docker run -e VAULT_ENCRYPTED_KEYS="your-encrypted-keys" -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
+```
+
+##### Using Binary
 
 For Kubernetes mode, create a secret with the encrypted keys:
 
