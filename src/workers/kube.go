@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// KubernetesWorker handles Vault unsealing via Kubernetes API proxy calls.
 type KubernetesWorker struct {
 	clientset          *kubernetes.Clientset
 	config             *rest.Config
@@ -31,6 +32,7 @@ type KubernetesWorker struct {
 	crypter            *crypter.Crypter
 }
 
+// NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via Kubernetes API.
 func NewKubernetesWorker(
 	vaultNamespace string,
 	unsealKeys []string,
@@ -67,6 +69,7 @@ func NewKubernetesWorker(
 	}
 }
 
+// loadKubeConfig loads Kubernetes configuration from in-cluster or external kubeconfig file.
 func loadKubeConfig() (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -79,6 +82,7 @@ func loadKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
+// getVaultPods retrieves the list of Vault pod names based on the configured label selector.
 func (k *KubernetesWorker) getVaultPods() ([]string, error) {
 	for counter := 1; counter <= k.podScanMaxCounter; counter++ {
 		podList, err := k.clientset.CoreV1().Pods(k.vaultNamespace).List(context.TODO(), v1.ListOptions{
@@ -115,11 +119,13 @@ func (k *KubernetesWorker) getVaultPods() ([]string, error) {
 	return nil, fmt.Errorf("max pod scan counter reached")
 }
 
+// generateURL generates the Kubernetes API proxy URL for accessing a pod's endpoint.
 func (k *KubernetesWorker) generateURL(podName, endpoint string) string {
 	return fmt.Sprintf("%s/api/v1/namespaces/%s/pods/%s/proxy%s",
 		k.config.Host, k.vaultNamespace, podName, endpoint)
 }
 
+// checkVaultSealedStatus checks if the Vault pod is sealed.
 func (k *KubernetesWorker) checkVaultSealedStatus(podName string) (bool, error) {
 	url := k.generateURL(podName, "/v1/sys/seal-status")
 	req, err := http.NewRequest("GET", url, nil)
@@ -153,6 +159,7 @@ func (k *KubernetesWorker) checkVaultSealedStatus(podName string) (bool, error) 
 	return sealed, nil
 }
 
+// unsealVaultPod attempts to unseal the Vault pod with the provided key.
 func (k *KubernetesWorker) unsealVaultPod(podName, unsealKey string) (map[string]interface{}, error) {
 	url := k.generateURL(podName, "/v1/sys/unseal")
 	body := map[string]string{"key": unsealKey}
@@ -188,6 +195,7 @@ func (k *KubernetesWorker) unsealVaultPod(podName, unsealKey string) (map[string
 	return response, nil
 }
 
+// loadKeysFromSecret loads and decrypts the unseal keys from the configured Kubernetes secret.
 func (k *KubernetesWorker) loadKeysFromSecret() error {
 	secret, err := k.clientset.CoreV1().Secrets(k.secretNamespace).Get(context.TODO(), k.secretName, v1.GetOptions{})
 	if err != nil {
@@ -213,6 +221,7 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 	return nil
 }
 
+// Start begins the Kubernetes worker's unsealing loop, continuously checking and unsealing Vault pods.
 func (k *KubernetesWorker) Start() {
 	// Load keys from secret on startup
 	if err := k.loadKeysFromSecret(); err != nil {

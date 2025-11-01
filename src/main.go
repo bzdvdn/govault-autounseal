@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config holds the application configuration loaded from YAML file.
 type Config struct {
 	WaitInterval int         `yaml:"wait_interval" mapstructure:"wait_interval"`
 	SecretKey    string      `yaml:"secret_key" mapstructure:"secret_key"`
@@ -22,6 +23,7 @@ type Config struct {
 	HTTPConfig   *HTTPConfig `yaml:"http_config,omitempty" mapstructure:"http_config"`
 }
 
+// KubeConfig holds Kubernetes-specific configuration for Vault unsealing.
 type KubeConfig struct {
 	VaultNamespace     string `yaml:"vault_namespace" mapstructure:"vault_namespace"`
 	VaultLabelSelector string `yaml:"vault_label_selector" mapstructure:"vault_label_selector"`
@@ -31,12 +33,14 @@ type KubeConfig struct {
 	SecretNamespace    string `yaml:"secret_namespace" mapstructure:"secret_namespace"`
 }
 
+// HTTPConfig holds HTTP-specific configuration for Vault unsealing.
 type HTTPConfig struct {
 	VaultURLs []string `yaml:"vault_urls" mapstructure:"vault_urls"`
 	Username  *string  `yaml:"username,omitempty" mapstructure:"username"`
 	Password  *string  `yaml:"password,omitempty" mapstructure:"password"`
 }
 
+// loadConfig loads and parses the configuration from YAML file or environment variables.
 func loadConfig(configPath string) (*Config, error) {
 	if configPath != "" {
 		viper.SetConfigFile(configPath)

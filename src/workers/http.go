@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// HTTPWorker handles Vault unsealing via HTTP API calls.
 type HTTPWorker struct {
 	vaultURLs    []string
 	username     *string
@@ -19,6 +20,7 @@ type HTTPWorker struct {
 	waitInterval int
 }
 
+// NewHTTPWorker creates a new HTTPWorker instance for unsealing Vault via HTTP.
 func NewHTTPWorker(
 	vaultURLs []string,
 	username *string,
@@ -35,6 +37,7 @@ func NewHTTPWorker(
 	}
 }
 
+// checkVaultSealedStatus checks if the Vault instance at the given URL is sealed.
 func (h *HTTPWorker) checkVaultSealedStatus(url string) (bool, error) {
 	req, err := http.NewRequest("GET", url+"/v1/sys/seal-status", nil)
 	if err != nil {
@@ -71,6 +74,7 @@ func (h *HTTPWorker) checkVaultSealedStatus(url string) (bool, error) {
 	return sealed, nil
 }
 
+// unsealVault attempts to unseal the Vault instance at the given URL with the provided key.
 func (h *HTTPWorker) unsealVault(url, unsealKey string) (map[string]interface{}, error) {
 	body := map[string]string{"key": unsealKey}
 	jsonBody, err := json.Marshal(body)
@@ -109,6 +113,7 @@ func (h *HTTPWorker) unsealVault(url, unsealKey string) (map[string]interface{},
 	return response, nil
 }
 
+// Start begins the HTTP worker's unsealing loop, continuously checking and unsealing Vault instances.
 func (h *HTTPWorker) Start() {
 	for {
 		for _, url := range h.vaultURLs {
