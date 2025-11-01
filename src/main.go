@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"govault-autounseal/src/workers"
 	"log"
 	"os"
+
+	"govault-autounseal/src/crypter"
+	"govault-autounseal/src/workers"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -25,6 +27,8 @@ type KubeConfig struct {
 	VaultLabelSelector string `yaml:"vault_label_selector" mapstructure:"vault_label_selector"`
 	PodScanMaxCounter  int    `yaml:"pod_scan_max_counter" mapstructure:"pod_scan_max_counter"`
 	PodScanDelay       int    `yaml:"pod_scan_delay" mapstructure:"pod_scan_delay"`
+	SecretName         string `yaml:"secret_name" mapstructure:"secret_name"`
+	SecretNamespace    string `yaml:"secret_namespace" mapstructure:"secret_namespace"`
 }
 
 type HTTPConfig struct {
@@ -95,8 +99,8 @@ var createSecretDataCmd = &cobra.Command{
 		}
 
 		keysJson, _ := json.Marshal(keysStr)
-		crypter := NewCrypter(config.SecretSalt)
-		encrypted, err := crypter.encrypt(string(keysJson), config.SecretKey)
+		crypter := crypter.NewCrypter(config.SecretSalt)
+		encrypted, err := crypter.Encrypt(string(keysJson), config.SecretKey)
 		if err != nil {
 			log.Fatalf("Failed to encrypt: %v", err)
 		}
@@ -116,8 +120,8 @@ var decryptSecretDataCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to load config: %v", err)
 		}
-		crypter := NewCrypter(config.SecretSalt)
-		decrypted, err := crypter.decrypt(key, config.SecretKey)
+		crypter := crypter.NewCrypter(config.SecretSalt)
+		decrypted, err := crypter.Decrypt(key, config.SecretKey)
 		if err != nil {
 			log.Fatalf("Failed to decrypt: %v", err)
 		}
@@ -137,8 +141,8 @@ var startCmd = &cobra.Command{
 			log.Fatalf("Failed to load config: %v", err)
 		}
 
-		crypter := NewCrypter(config.SecretSalt)
-		decryptedKeys, err := crypter.decrypt(encryptedKeys, config.SecretKey)
+		crypter := crypter.NewCrypter(config.SecretSalt)
+		decryptedKeys, err := crypter.Decrypt(encryptedKeys, config.SecretKey)
 		if err != nil {
 			log.Fatalf("Failed to decrypt keys: %v", err)
 		}
@@ -156,6 +160,9 @@ var startCmd = &cobra.Command{
 				config.KubeConfig.PodScanMaxCounter,
 				config.KubeConfig.PodScanDelay,
 				config.WaitInterval,
+				config.KubeConfig.SecretName,
+				config.KubeConfig.SecretNamespace,
+				crypter,
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {

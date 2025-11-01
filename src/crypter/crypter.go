@@ -1,4 +1,4 @@
-package main
+package crypter
 
 import (
 	"crypto/aes"
@@ -34,7 +34,7 @@ func NewCrypter(salt string) *Crypter {
 	return &Crypter{salt: salt}
 }
 
-func (c *Crypter) encrypt(strToEnc, secret string) (string, error) {
+func (c *Crypter) Encrypt(strToEnc, secret string) (string, error) {
 	aesObj, err := c.getAESObj(secret)
 	if err != nil {
 		return "", err
@@ -45,7 +45,7 @@ func (c *Crypter) encrypt(strToEnc, secret string) (string, error) {
 	return strings.ReplaceAll(strEnc, "/", "-_-"), nil
 }
 
-func (c *Crypter) decrypt(encStr, secret string) (string, error) {
+func (c *Crypter) Decrypt(encStr, secret string) (string, error) {
 	encStr = strings.ReplaceAll(encStr, "-_-", "/")
 	aesObj, err := c.getAESObj(secret)
 	if err != nil {

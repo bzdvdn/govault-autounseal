@@ -12,6 +12,8 @@ kube_config:
   vault_label_selector: "app.kubernetes.io/name=vault" # Label selector for Vault pods
   pod_scan_max_counter: 5 # Maximum number of pods to scan
   pod_scan_delay: 30 # Delay in seconds between pod scans
+  secret_name: "vault-unseal-keys" # Name of the secret containing encrypted keys
+  secret_namespace: "vault" # Namespace where the secret is located
 
 # HTTP configuration (optional)
 # http_config:

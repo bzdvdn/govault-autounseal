@@ -73,7 +73,19 @@ This will output an encrypted string containing your unseal keys.
 
 #### Run the Autounseal Service
 
-Set the encrypted keys as an environment variable and run:
+For Kubernetes mode, create a secret with the encrypted keys:
+
+```bash
+kubectl create secret generic vault-unseal-keys --from-literal=encrypted-keys="your-encrypted-keys" -n vault
+```
+
+Then run the service:
+
+```bash
+./govault-autounseal start --config config.yaml
+```
+
+For HTTP mode, set the encrypted keys as an environment variable:
 
 ```bash
 export VAULT_ENCRYPTED_KEYS="your-encrypted-keys"

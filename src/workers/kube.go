@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"govault-autounseal/src/crypter"
 	"io"
 	"net/http"
 	"time"
@@ -25,6 +26,9 @@ type KubernetesWorker struct {
 	podScanMaxCounter  int
 	podScanDelay       int
 	waitInterval       int
+	secretName         string
+	secretNamespace    string
+	crypter            *crypter.Crypter
 }
 
 func NewKubernetesWorker(
@@ -34,6 +38,9 @@ func NewKubernetesWorker(
 	podScanMaxCounter int,
 	podScanDelay int,
 	waitInterval int,
+	secretName string,
+	secretNamespace string,
+	crypter *crypter.Crypter,
 ) *KubernetesWorker {
 	config, err := loadKubeConfig()
 	if err != nil {
@@ -54,6 +61,9 @@ func NewKubernetesWorker(
 		podScanMaxCounter:  podScanMaxCounter,
 		podScanDelay:       podScanDelay,
 		waitInterval:       waitInterval,
+		secretName:         secretName,
+		secretNamespace:    secretNamespace,
+		crypter:            crypter,
 	}
 }
 
@@ -178,7 +188,37 @@ func (k *KubernetesWorker) unsealVaultPod(podName, unsealKey string) (map[string
 	return response, nil
 }
 
+func (k *KubernetesWorker) loadKeysFromSecret() error {
+	secret, err := k.clientset.CoreV1().Secrets(k.secretNamespace).Get(context.TODO(), k.secretName, v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get secret %s/%s: %v", k.secretNamespace, k.secretName, err)
+	}
+
+	encryptedKeys, ok := secret.Data["encrypted-keys"]
+	if !ok {
+		return fmt.Errorf("encrypted-keys key not found in secret %s/%s", k.secretNamespace, k.secretName)
+	}
+
+	decryptedKeys, err := k.crypter.Decrypt(string(encryptedKeys), "")
+	if err != nil {
+		return fmt.Errorf("failed to decrypt keys: %v", err)
+	}
+
+	var unsealKeys []string
+	if err := json.Unmarshal([]byte(decryptedKeys), &unsealKeys); err != nil {
+		return fmt.Errorf("failed to parse decrypted keys: %v", err)
+	}
+
+	k.unsealKeys = unsealKeys
+	return nil
+}
+
 func (k *KubernetesWorker) Start() {
+	// Load keys from secret on startup
+	if err := k.loadKeysFromSecret(); err != nil {
+		logrus.Fatalf("Failed to load keys from secret: %v", err)
+	}
+
 	for {
 		podNames, err := k.getVaultPods()
 		if err != nil {
