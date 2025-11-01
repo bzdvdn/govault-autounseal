@@ -1,0 +1,22 @@
+# Example configuration file for govaukt-autounseal
+# Copy this file to config.yaml and modify the values as needed
+
+# Basic application settings
+wait_interval: 30 # Interval in seconds between unsealing attempts
+secret_key: "test2310" # Key for encryption/decryption
+secret_salt: "SlTKeYOpHygTYkP3" # Salt for encryption (default is fine)
+
+# Kubernetes configuration (optional)
+kube_config:
+  vault_namespace: "vault" # Namespace where Vault pods are running
+  vault_label_selector: "app.kubernetes.io/name=vault" # Label selector for Vault pods
+  pod_scan_max_counter: 5 # Maximum number of pods to scan
+  pod_scan_delay: 30 # Delay in seconds between pod scans
+
+# HTTP configuration (optional)
+# http_config:
+#   vault_urls:
+#     - "https://vault.example.com:8200" # List of Vault URLs to unseal
+#     - "https://vault2.example.com:8200"
+#   username: "admin" # Basic auth username (optional)
+#   password: "password" # Basic auth password (optional)

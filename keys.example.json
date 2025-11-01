@@ -1,0 +1,21 @@
+{
+    "keys": [
+        "2a6c1d5e3b8e9f1a7d4c2b8e3f6a9d1e4b7c8f2a5d3e6b9f0c1d2e3f4a5b6c7d8e9f0"
+    ],
+    "keys_base64": [
+        "KmwdXjuOnxp9TCuOP2qdHkt8jypePmufDB0uP0pbZ8fYnw=="
+    ],
+    "root_token": "hvs.CAESIIlCwXcJZJN9Z2x2ZnV3Z3h5eip8fYGBgoOEhYaHiIiJiqALMApBUXVxVlVXc3h6e3x9fn-AwMQ",
+    "unseal_keys_b64": [
+        "KmwdXjuOnxp9TCuOP2qdHkt8jypePmufDB0uP0pbZ8fYnw=="
+    ],
+    "unseal_keys_hex": [
+        "2a6c1d5e3b8e9f1a7d4c2b8e3f6a9d1e4b7c8f2a5d3e6b9f0c1d2e3f4a5b6c7d8e9f0"
+    ],
+    "recovery_keys_b64": [
+        "TI0+d5oLCx0+T1p2x43o8aKzxNXm96i5wNHi80pWx48="
+    ],
+    "recovery_keys_hex": [
+        "4c8d3e7f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f"
+    ]
+}
