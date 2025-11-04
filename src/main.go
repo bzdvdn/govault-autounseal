@@ -39,9 +39,10 @@ type KubeConfig struct {
 
 // HTTPConfig holds HTTP-specific configuration for Vault unsealing.
 type HTTPConfig struct {
-	VaultURLs []string `yaml:"vault_urls" mapstructure:"vault_urls"`
-	Username  *string  `yaml:"username,omitempty" mapstructure:"username"`
-	Password  *string  `yaml:"password,omitempty" mapstructure:"password"`
+	VaultURLs     []string `yaml:"vault_urls" mapstructure:"vault_urls"`
+	Username      *string  `yaml:"username,omitempty" mapstructure:"username"`
+	Password      *string  `yaml:"password,omitempty" mapstructure:"password"`
+	EncryptedKeys string   `yaml:"encrypted_keys" mapstructure:"encrypted_keys"`
 }
 
 // loadConfig loads and parses the configuration from YAML file or environment variables.
@@ -73,6 +74,7 @@ var rootCmd = &cobra.Command{
 	Short: "Vault autounseal tool in Go",
 }
 
+// createSecretDataCmd is the command for creating encrypted secret data from Vault keys.
 var createSecretDataCmd = &cobra.Command{
 	Use:   "create_secret_data",
 	Short: "Create encrypted secret data from Vault keys",
@@ -195,15 +197,25 @@ var startCmd = &cobra.Command{
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {
-			// worker := workers.NewHTTPWorker(
-			// 	config.HTTPConfig.VaultURLs,
-			// 	config.HTTPConfig.Username,
-			// 	config.HTTPConfig.Password,
-			// 	unsealKeys,
-			// 	config.WaitInterval,
-			// )
-			// worker.Start()
-			fmt.Println(("HTTP config"))
+			if config.HTTPConfig.EncryptedKeys == "" {
+				log.Fatalf("encrypted_keys is required for HTTP config")
+			}
+
+			decrypted, err := crypter.Decrypt(config.HTTPConfig.EncryptedKeys, config.SecretKey)
+			if err != nil {
+				log.Fatalf("Failed to decrypt encrypted keys: %v", err)
+			}
+
+			var secretData secrets.SecretData
+			if err := secretData.Unmarshal([]byte(decrypted)); err != nil {
+				log.Fatalf("Failed to unmarshal decrypted keys: %v", err)
+			}
+
+			worker := workers.NewHTTPWorker(
+				config.HTTPConfig.VaultURLs,
+				config.WaitInterval,
+			)
+			worker.Start(secretData.Keys)
 		} else {
 			log.Fatalf("No worker configuration found")
 		}

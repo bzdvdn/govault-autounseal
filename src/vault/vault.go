@@ -22,7 +22,7 @@ func NewClient(baseURLs []string) *Client {
 }
 
 // CheckSealStatus checks if Vault is sealed by querying the first available URL.
-func (c *Client) checkSealStatus(baseURL string) (*SealStatus, error) {
+func (c *Client) CheckSealStatus(baseURL string) (*SealStatus, error) {
 	url := fmt.Sprintf("%s/v1/sys/seal-status", baseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -68,7 +68,7 @@ func (c *Client) checkSealStatus(baseURL string) (*SealStatus, error) {
 }
 
 // Unseal attempts to unseal Vault with the given key by trying each URL.
-func (c *Client) unseal(baseURL string, key string) (*UnsealResponse, error) {
+func (c *Client) Unseal(baseURL string, key string) (*UnsealResponse, error) {
 	body := map[string]string{"key": key}
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
@@ -117,11 +117,12 @@ func (c *Client) unseal(baseURL string, key string) (*UnsealResponse, error) {
 	return &unsealResp, nil
 }
 
+// Run performs the auto-unsealing process for all configured Vault instances using the provided unseal keys.
 func (c *Client) Run(unsealKeys []string) {
 	for _, baseURL := range c.baseURLs {
 		logrus.Infof("Checking seal status for Vault at %s", baseURL)
 		for {
-			resp, err := c.checkSealStatus(baseURL)
+			resp, err := c.CheckSealStatus(baseURL)
 			if err != nil {
 				logrus.Errorf("Failed to check seal status for %s: %v", baseURL, err)
 				break
@@ -133,7 +134,7 @@ func (c *Client) Run(unsealKeys []string) {
 				logrus.Infof("Vault at %s is sealed, attempting to unseal", baseURL)
 				for _, unsealKey := range unsealKeys {
 					logrus.Infof("Attempting to unseal Vault at %s with key", baseURL)
-					_, err := c.unseal(baseURL, unsealKey)
+					_, err := c.Unseal(baseURL, unsealKey)
 					if err != nil {
 						logrus.Errorf("Failed to unseal Vault at %s: %v", baseURL, err)
 					} else {
