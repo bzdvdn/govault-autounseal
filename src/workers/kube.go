@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// KubernetesWorker handles Vault unsealing via Kubernetes API proxy calls.
+// KubernetesWorker handles Vault unsealing via direct pod IP connections.
 type KubernetesWorker struct {
 	clientset          *kubernetes.Clientset
 	config             *rest.Config
@@ -30,12 +30,10 @@ type KubernetesWorker struct {
 	secretNamespace    string
 	crypter            *crypter.Crypter
 	secretKey          string
-	vaultServiceName   string
-	vaultServicePort   int
-	clusterDomain      string
+	vaultPodPort       int
 }
 
-// NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via Kubernetes API.
+// NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via direct pod connections.
 func NewKubernetesWorker(
 	vaultNamespace string,
 	vaultLabelSelector string,
@@ -46,9 +44,7 @@ func NewKubernetesWorker(
 	secretNamespace string,
 	crypter *crypter.Crypter,
 	secretKey string,
-	vaultServiceName string,
-	vaultServicePort int,
-	clusterDomain string,
+	vaultPodPort int,
 ) *KubernetesWorker {
 	config, err := loadKubeConfig()
 	if err != nil {
@@ -72,9 +68,7 @@ func NewKubernetesWorker(
 		secretNamespace:    secretNamespace,
 		crypter:            crypter,
 		secretKey:          secretKey,
-		vaultServiceName:   vaultServiceName,
-		vaultServicePort:   vaultServicePort,
-		clusterDomain:      clusterDomain,
+		vaultPodPort:       vaultPodPort,
 	}
 }
 
@@ -113,8 +107,8 @@ func loadKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-// getVaultPods retrieves the list of Vault pod names based on the configured label selector.
-func (k *KubernetesWorker) getVaultPods() ([]string, error) {
+// getVaultPodIPs retrieves the list of Vault pod IPs based on the configured label selector.
+func (k *KubernetesWorker) getVaultPodIPs() ([]string, error) {
 	for counter := 1; counter <= k.podScanMaxCounter; counter++ {
 		logrus.Debugf("Listing pods in namespace %s with label selector %s", k.vaultNamespace, k.vaultLabelSelector)
 		podList, err := k.clientset.CoreV1().Pods(k.vaultNamespace).List(context.TODO(), metav1.ListOptions{
@@ -144,12 +138,12 @@ func (k *KubernetesWorker) getVaultPods() ([]string, error) {
 			continue
 		}
 
-		var podNames []string
+		var podIPs []string
 		for _, pod := range podList.Items {
-			podNames = append(podNames, pod.Name)
+			podIPs = append(podIPs, pod.Status.PodIP)
 		}
 
-		return podNames, nil
+		return podIPs, nil
 	}
 	return nil, fmt.Errorf("max pod scan counter reached")
 }
@@ -185,10 +179,10 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 	return nil
 }
 
-func (k *KubernetesWorker) generateVaultURLS(podNames []string) []string {
+func (k *KubernetesWorker) generateVaultURLS(podIPs []string) []string {
 	var vaultURLs []string
-	for _, podName := range podNames {
-		vaultURLs = append(vaultURLs, fmt.Sprintf("http://%s.%s.%s.svc.%s:%d", podName, k.vaultServiceName, k.vaultNamespace, k.clusterDomain, k.vaultServicePort))
+	for _, podIP := range podIPs {
+		vaultURLs = append(vaultURLs, fmt.Sprintf("http://%s:%d", podIP, k.vaultPodPort))
 	}
 	return vaultURLs
 }
@@ -201,16 +195,15 @@ func (k *KubernetesWorker) Start() {
 	}
 
 	for {
-		podNames, err := k.getVaultPods()
+		podIPs, err := k.getVaultPodIPs()
 		if err != nil {
 			logrus.Error(err)
 			time.Sleep(time.Duration(k.waitInterval) * time.Second)
 			continue
 		}
-		vaultURLs := k.generateVaultURLS(podNames)
+		vaultURLs := k.generateVaultURLS(podIPs)
 		vaultClient := vault.NewClient(vaultURLs)
 		vaultClient.Run(k.unsealKeys)
-
 		time.Sleep(time.Duration(k.waitInterval) * time.Second)
 	}
 }

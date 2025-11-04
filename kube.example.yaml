@@ -14,6 +14,7 @@ kube_config:
   pod_scan_delay: 30 # Delay in seconds between pod scans
   secret_name: "vault-unseal-keys" # Name of the secret containing encrypted keys
   secret_namespace: "vault" # Namespace where the secret is located
+  vault_pod_port: 8200 # Port on which Vault pods are listening
 
 # HTTP configuration (optional)
 # http_config:

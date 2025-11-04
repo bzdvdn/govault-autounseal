@@ -5,7 +5,7 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
 ### Features
 
 - **Automatic Unsealing**: Continuously monitors Vault instances and unseals them when they become sealed
-- **Multiple Backends**: Supports both Kubernetes (via API proxy) and direct HTTP access
+- **Multi-Backend Support**: Compatible with Kubernetes environments using API proxy and standalone HTTP-based Vault deployments
 - **Encrypted Key Storage**: Securely stores unseal keys using AES encryption
 - **Configuration Flexibility**: Supports YAML configuration files and environment variables
 
@@ -14,8 +14,8 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
 #### Option 1: Build from source
 
 1. Clone the repository
-2. Run `go build` to compile the binary
-3. Copy `config.example.yaml` to `config.yaml` and modify as needed
+2. Run `go build ./src` to compile the binary
+3. Copy one of the example configuration files (`kube.example.yaml` or `http.example.yaml`) to `config.yaml` and modify as needed
 
 #### Option 2: Docker
 
@@ -24,7 +24,7 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
    ```bash
    docker build -t govault-autounseal .
    ```
-3. Copy `config.example.yaml` to `config.yaml` and modify as needed
+3. Copy one of the example configuration files (`kube.example.yaml` or `http.example.yaml`) to `config.yaml` and modify as needed
 
 ### Configuration
 
@@ -41,16 +41,15 @@ The application can be configured via:
      vault_label_selector: "app.kubernetes.io/name=vault"
      pod_scan_max_counter: 5
      pod_scan_delay: 30
-     vault_service_name: "vault-internal"  # optional, defaults to "vault-internal"
-     vault_service_port: 8200  # optional, defaults to 8200
-     cluster_domain: "cluster.local"  # optional, defaults to "cluster.local"
+     secret_name: "vault-unseal-keys"
+     secret_namespace: "vault"
+     vault_pod_port: 8200  # optional, defaults to 8200
 
    # OR for HTTP mode:
    http_config:
-     vault_urls:
-       - "https://vault.example.com:8200"
-     username: "admin"  # optional
-     password: "password"  # optional
+      vault_urls:
+        - "https://vault.example.com:8200"
+      encrypted_keys: "WyJ0ZXN0Il0K" # base64 encoded ["test"]
 
    # HTTP server configuration for health checks (always enabled, default port 2310)
    http_server:
@@ -58,20 +57,19 @@ The application can be configured via:
    ```
 
 2. **Environment Variables**:
-    - `VAULT_WAIT_INTERVAL`
-    - `VAULT_SECRET_KEY`
-    - `VAULT_SECRET_SALT`
-    - `VAULT_KUBE_ENABLED`
-    - `VAULT_KUBE_NAMESPACE`
-    - `VAULT_KUBE_LABEL_SELECTOR`
-    - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
-    - `VAULT_KUBE_POD_SCAN_DELAY`
-    - `VAULT_KUBE_SECRET_NAME`
-    - `VAULT_KUBE_SECRET_NAMESPACE`
-    - `VAULT_HTTP_ENABLED`
-    - `VAULT_HTTP_URLS`
-    - `VAULT_HTTP_USERNAME`
-    - `VAULT_HTTP_PASSWORD`
+     - `VAULT_WAIT_INTERVAL`
+     - `VAULT_SECRET_KEY`
+     - `VAULT_SECRET_SALT`
+     - `VAULT_ENCRYPTED_KEYS`
+     - `VAULT_KUBE_NAMESPACE`
+     - `VAULT_KUBE_LABEL_SELECTOR`
+     - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
+     - `VAULT_KUBE_POD_SCAN_DELAY`
+     - `VAULT_KUBE_SECRET_NAME`
+     - `VAULT_KUBE_SECRET_NAMESPACE`
+     - `VAULT_KUBE_VAULT_POD_PORT`
+     - `VAULT_HTTP_URLS`
+     - `VAULT_HTTP_SERVER_PORT`
 
 ### Usage
 
@@ -127,10 +125,9 @@ Then run the service:
 ./govault-autounseal start --config config.yaml
 ```
 
-For HTTP mode, set the encrypted keys as an environment variable:
+For HTTP mode, ensure the encrypted keys are specified in the `http_config.encrypted_keys` field of your `config.yaml` file, then run the service:
 
 ```bash
-export VAULT_ENCRYPTED_KEYS="your-encrypted-keys"
 ./govault-autounseal start --config config.yaml
 ```
 
