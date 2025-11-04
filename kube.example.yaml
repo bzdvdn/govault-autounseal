@@ -22,3 +22,7 @@ kube_config:
 #     - "https://vault2.example.com:8200"
 #   username: "admin" # Basic auth username (optional)
 #   password: "password" # Basic auth password (optional)
+
+# HTTP server configuration for health checks (optional)
+http_server:
+  port: 2310 # Port for the health check server

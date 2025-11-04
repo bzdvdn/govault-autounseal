@@ -51,6 +51,10 @@ The application can be configured via:
        - "https://vault.example.com:8200"
      username: "admin"  # optional
      password: "password"  # optional
+
+   # HTTP server configuration for health checks (always enabled, default port 2310)
+   http_server:
+     port: 2310
    ```
 
 2. **Environment Variables**:

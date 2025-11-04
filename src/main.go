@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"govault-autounseal/src/crypter"
@@ -22,6 +23,12 @@ type Config struct {
 	SecretSalt   string      `yaml:"secret_salt" mapstructure:"secret_salt"`
 	KubeConfig   *KubeConfig `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
 	HTTPConfig   *HTTPConfig `yaml:"http_config,omitempty" mapstructure:"http_config"`
+	HTTPServer   *HTTPServer `yaml:"http_server,omitempty" mapstructure:"http_server"`
+}
+
+// HTTPServer holds HTTP server configuration for health checks.
+type HTTPServer struct {
+	Port int `yaml:"port" mapstructure:"port"`
 }
 
 // KubeConfig holds Kubernetes-specific configuration for Vault unsealing.
@@ -156,6 +163,21 @@ var decryptSecretDataCmd = &cobra.Command{
 	},
 }
 
+// healthHandler provides a simple health check endpoint.
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
+// startHTTPServer starts the HTTP server for health checks.
+func startHTTPServer(port int) {
+	http.HandleFunc("/health", healthHandler)
+	log.Printf("Starting HTTP server on port %d", port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+		log.Fatalf("Failed to start HTTP server: %v", err)
+	}
+}
+
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the autounseal service",
@@ -166,6 +188,13 @@ var startCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to load config: %v", err)
 		}
+
+		// Start HTTP server (always enabled, default port 2310)
+		port := 2310
+		if config.HTTPServer != nil && config.HTTPServer.Port != 0 {
+			port = config.HTTPServer.Port
+		}
+		go startHTTPServer(port)
 
 		crypter := crypter.NewCrypter(config.SecretSalt)
 		if config.KubeConfig != nil {
