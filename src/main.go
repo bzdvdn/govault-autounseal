@@ -173,6 +173,7 @@ var startCmd = &cobra.Command{
 				config.KubeConfig.SecretName,
 				config.KubeConfig.SecretNamespace,
 				crypter,
+				config.SecretKey,
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {

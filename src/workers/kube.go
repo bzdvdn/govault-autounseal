@@ -31,6 +31,7 @@ type KubernetesWorker struct {
 	secretName         string
 	secretNamespace    string
 	crypter            *crypter.Crypter
+	secretKey          string
 }
 
 // NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via Kubernetes API.
@@ -43,6 +44,7 @@ func NewKubernetesWorker(
 	secretName string,
 	secretNamespace string,
 	crypter *crypter.Crypter,
+	secretKey string,
 ) *KubernetesWorker {
 	config, err := loadKubeConfig()
 	if err != nil {
@@ -65,6 +67,7 @@ func NewKubernetesWorker(
 		secretName:         secretName,
 		secretNamespace:    secretNamespace,
 		crypter:            crypter,
+		secretKey:          secretKey,
 	}
 }
 
@@ -206,7 +209,7 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 		return fmt.Errorf("encrypted-keys key not found in secret %s/%s", k.secretNamespace, k.secretName)
 	}
 
-	decryptedKeys, err := k.crypter.Decrypt(string(encryptedKeys), "")
+	decryptedKeys, err := k.crypter.Decrypt(string(encryptedKeys), k.secretKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt keys: %v", err)
 	}
