@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"govault-autounseal/src/crypter"
+	"govault-autounseal/src/secrets"
 	"govault-autounseal/src/workers"
 
 	"github.com/spf13/cobra"
@@ -102,7 +103,11 @@ var createSecretDataCmd = &cobra.Command{
 			keysStr[i] = k.(string)
 		}
 
-		keysJson, _ := json.Marshal(keysStr)
+		secretData := secrets.SecretData{Keys: keysStr}
+		keysJson, err := secretData.Marshal()
+		if err != nil {
+			log.Fatalf("Failed to marshal data: %v", err)
+		}
 		crypter := crypter.NewCrypter(config.SecretSalt)
 		encrypted, err := crypter.Encrypt(string(keysJson), config.SecretKey)
 		if err != nil {
@@ -129,7 +134,20 @@ var decryptSecretDataCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to decrypt: %v", err)
 		}
-		fmt.Println(decrypted)
+		var secretData secrets.SecretData
+		if err := secretData.Unmarshal([]byte(decrypted)); err != nil {
+			// Try to unmarshal as old format (array of strings)
+			var keys []string
+			if err2 := json.Unmarshal([]byte(decrypted), &keys); err2 != nil {
+				log.Fatalf("Failed to unmarshal decrypted data: %v", err)
+			}
+			secretData.Keys = keys
+		}
+		keysJson, err := json.Marshal(secretData)
+		if err != nil {
+			log.Fatalf("Failed to marshal keys: %v", err)
+		}
+		fmt.Println(string(keysJson))
 	},
 }
 
@@ -138,7 +156,6 @@ var startCmd = &cobra.Command{
 	Short: "Start the autounseal service",
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
-		encryptedKeys, _ := cmd.Flags().GetString("encrypted-keys")
 
 		config, err := loadConfig(configPath)
 		if err != nil {
@@ -146,20 +163,9 @@ var startCmd = &cobra.Command{
 		}
 
 		crypter := crypter.NewCrypter(config.SecretSalt)
-		decryptedKeys, err := crypter.Decrypt(encryptedKeys, config.SecretKey)
-		if err != nil {
-			log.Fatalf("Failed to decrypt keys: %v", err)
-		}
-
-		var unsealKeys []string
-		if err := json.Unmarshal([]byte(decryptedKeys), &unsealKeys); err != nil {
-			log.Fatalf("Failed to parse decrypted keys: %v", err)
-		}
-
 		if config.KubeConfig != nil {
 			worker := workers.NewKubernetesWorker(
 				config.KubeConfig.VaultNamespace,
-				unsealKeys,
 				config.KubeConfig.VaultLabelSelector,
 				config.KubeConfig.PodScanMaxCounter,
 				config.KubeConfig.PodScanDelay,
@@ -170,14 +176,15 @@ var startCmd = &cobra.Command{
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {
-			worker := workers.NewHTTPWorker(
-				config.HTTPConfig.VaultURLs,
-				config.HTTPConfig.Username,
-				config.HTTPConfig.Password,
-				unsealKeys,
-				config.WaitInterval,
-			)
-			worker.Start()
+			// worker := workers.NewHTTPWorker(
+			// 	config.HTTPConfig.VaultURLs,
+			// 	config.HTTPConfig.Username,
+			// 	config.HTTPConfig.Password,
+			// 	unsealKeys,
+			// 	config.WaitInterval,
+			// )
+			// worker.Start()
+			fmt.Println(("HTTP config"))
 		} else {
 			log.Fatalf("No worker configuration found")
 		}
@@ -192,8 +199,6 @@ func init() {
 	createSecretDataCmd.Flags().String("config", "", "Path to config file")
 	decryptSecretDataCmd.Flags().String("config", "", "Path to config file")
 	startCmd.Flags().String("config", "", "Path to config file")
-	startCmd.Flags().String("encrypted-keys", "", "Encrypted unseal keys")
-	startCmd.MarkFlagRequired("encrypted-keys")
 }
 
 func main() {

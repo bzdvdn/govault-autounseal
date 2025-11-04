@@ -10,23 +10,25 @@ import (
 	"strings"
 )
 
-// aesCipher holds the AES block and stream cipher for encryption/decryption operations.
+// aesCipher holds the AES block for encryption/decryption operations.
 type aesCipher struct {
-	block  cipher.Block
-	stream cipher.Stream
+	block cipher.Block
+	iv    []byte
 }
 
-// encrypt encrypts the given data using AES stream cipher.
+// encrypt encrypts the given data using AES CFB mode.
 func (a *aesCipher) encrypt(data []byte) []byte {
+	stream := cipher.NewCFBEncrypter(a.block, a.iv)
 	encrypted := make([]byte, len(data))
-	a.stream.XORKeyStream(encrypted, data)
+	stream.XORKeyStream(encrypted, data)
 	return encrypted
 }
 
-// decrypt decrypts the given data using AES stream cipher.
+// decrypt decrypts the given data using AES CFB mode.
 func (a *aesCipher) decrypt(data []byte) []byte {
+	stream := cipher.NewCFBDecrypter(a.block, a.iv)
 	decrypted := make([]byte, len(data))
-	a.stream.XORKeyStream(decrypted, data)
+	stream.XORKeyStream(decrypted, data)
 	return decrypted
 }
 
@@ -82,6 +84,5 @@ func (c *Crypter) getAESObj(key string) (*aesCipher, error) {
 		return nil, fmt.Errorf("IV must be %d bytes long", aes.BlockSize)
 	}
 
-	stream := cipher.NewCFBEncrypter(block, iv)
-	return &aesCipher{block: block, stream: stream}, nil
+	return &aesCipher{block: block, iv: iv}, nil
 }

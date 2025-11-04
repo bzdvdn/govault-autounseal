@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"govault-autounseal/src/crypter"
+	"govault-autounseal/src/secrets"
 	"io"
 	"net/http"
 	"time"
@@ -35,7 +36,6 @@ type KubernetesWorker struct {
 // NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via Kubernetes API.
 func NewKubernetesWorker(
 	vaultNamespace string,
-	unsealKeys []string,
 	vaultLabelSelector string,
 	podScanMaxCounter int,
 	podScanDelay int,
@@ -57,7 +57,6 @@ func NewKubernetesWorker(
 	return &KubernetesWorker{
 		clientset:          clientset,
 		config:             config,
-		unsealKeys:         unsealKeys,
 		vaultNamespace:     vaultNamespace,
 		vaultLabelSelector: vaultLabelSelector,
 		podScanMaxCounter:  podScanMaxCounter,
@@ -212,12 +211,17 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 		return fmt.Errorf("failed to decrypt keys: %v", err)
 	}
 
-	var unsealKeys []string
-	if err := json.Unmarshal([]byte(decryptedKeys), &unsealKeys); err != nil {
-		return fmt.Errorf("failed to parse decrypted keys: %v", err)
+	var secretData secrets.SecretData
+	if err := secretData.Unmarshal([]byte(decryptedKeys)); err != nil {
+		// Try to unmarshal as old format (array of strings)
+		var unsealKeys []string
+		if err2 := json.Unmarshal([]byte(decryptedKeys), &unsealKeys); err2 != nil {
+			return fmt.Errorf("failed to parse decrypted keys: %v", err)
+		}
+		secretData.Keys = unsealKeys
 	}
 
-	k.unsealKeys = unsealKeys
+	k.unsealKeys = secretData.Keys
 	return nil
 }
 

@@ -73,7 +73,7 @@ The application can be configured via:
 First, encrypt your unseal keys from the Vault init response. Encode the JSON content of keys.json as base64 and pass it as an argument:
 
 ```bash
-base64 -w 0 keys.json | ./govault-autounseal create_secret_data --config config.yaml
+export KEYS_B64=$(base64 -w 0 keys.example.json) && ./govault-autounseal create_secret_data $KEYS_B64 --config config.yaml > enc-keys
 ```
 
 This will output an encrypted string containing your unseal keys.
@@ -81,7 +81,7 @@ This will output an encrypted string containing your unseal keys.
 #### Decrypt Keys (for verification)
 
 ```bash
-./govault-autounseal decrypt_secret_data "encrypted-string" --config config.yaml
+export ENC_DATA=$(cat enc-keys) && ./govault-autounseal decrypt_secret_data $ENC_DATA --config config.yaml
 ```
 
 #### Run the Autounseal Service
