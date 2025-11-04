@@ -1,18 +1,16 @@
 package workers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"govault-autounseal/src/crypter"
 	"govault-autounseal/src/secrets"
-	"io"
-	"net/http"
+	"govault-autounseal/src/vault"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -32,6 +30,9 @@ type KubernetesWorker struct {
 	secretNamespace    string
 	crypter            *crypter.Crypter
 	secretKey          string
+	vaultServiceName   string
+	vaultServicePort   int
+	clusterDomain      string
 }
 
 // NewKubernetesWorker creates a new KubernetesWorker instance for unsealing Vault via Kubernetes API.
@@ -45,16 +46,19 @@ func NewKubernetesWorker(
 	secretNamespace string,
 	crypter *crypter.Crypter,
 	secretKey string,
+	vaultServiceName string,
+	vaultServicePort int,
+	clusterDomain string,
 ) *KubernetesWorker {
 	config, err := loadKubeConfig()
 	if err != nil {
 		logrus.Fatalf("Failed to load kube config: %v", err)
 	}
-
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		logrus.Fatalf("Failed to create clientset: %v", err)
 	}
+	logrus.Info("Successfully created Kubernetes clientset")
 
 	return &KubernetesWorker{
 		clientset:          clientset,
@@ -68,6 +72,9 @@ func NewKubernetesWorker(
 		secretNamespace:    secretNamespace,
 		crypter:            crypter,
 		secretKey:          secretKey,
+		vaultServiceName:   vaultServiceName,
+		vaultServicePort:   vaultServicePort,
+		clusterDomain:      clusterDomain,
 	}
 }
 
@@ -75,11 +82,33 @@ func NewKubernetesWorker(
 func loadKubeConfig() (*rest.Config, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
+		logrus.Warnf("Failed to load in-cluster config: %v", err)
 		kubeconfig := clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename()
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		logrus.Infof("Trying external kubeconfig: %s", kubeconfig)
+
+		// Load the kubeconfig and get the current context
+		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig},
+			&clientcmd.ConfigOverrides{},
+		)
+
+		rawConfig, err := clientConfig.RawConfig()
 		if err != nil {
+			logrus.Errorf("Failed to load raw kubeconfig: %v", err)
 			return nil, err
 		}
+
+		currentContext := rawConfig.CurrentContext
+		logrus.Infof("Current kubeconfig context: %s", currentContext)
+
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			logrus.Errorf("Failed to load external kubeconfig: %v", err)
+			return nil, err
+		}
+		logrus.Info("Successfully loaded external kubeconfig")
+	} else {
+		logrus.Info("Successfully loaded in-cluster config")
 	}
 	return config, nil
 }
@@ -87,12 +116,15 @@ func loadKubeConfig() (*rest.Config, error) {
 // getVaultPods retrieves the list of Vault pod names based on the configured label selector.
 func (k *KubernetesWorker) getVaultPods() ([]string, error) {
 	for counter := 1; counter <= k.podScanMaxCounter; counter++ {
-		podList, err := k.clientset.CoreV1().Pods(k.vaultNamespace).List(context.TODO(), v1.ListOptions{
+		logrus.Debugf("Listing pods in namespace %s with label selector %s", k.vaultNamespace, k.vaultLabelSelector)
+		podList, err := k.clientset.CoreV1().Pods(k.vaultNamespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: k.vaultLabelSelector,
 		})
 		if err != nil {
+			logrus.Errorf("Failed to list pods: %v", err)
 			return nil, err
 		}
+		logrus.Debugf("Found %d pods", len(podList.Items))
 
 		if len(podList.Items) == 0 {
 			logrus.Errorf("No Vault pods found. Label Selector: %s", k.vaultLabelSelector)
@@ -116,90 +148,15 @@ func (k *KubernetesWorker) getVaultPods() ([]string, error) {
 		for _, pod := range podList.Items {
 			podNames = append(podNames, pod.Name)
 		}
+
 		return podNames, nil
 	}
 	return nil, fmt.Errorf("max pod scan counter reached")
 }
 
-// generateURL generates the Kubernetes API proxy URL for accessing a pod's endpoint.
-func (k *KubernetesWorker) generateURL(podName, endpoint string) string {
-	return fmt.Sprintf("%s/api/v1/namespaces/%s/pods/%s/proxy%s",
-		k.config.Host, k.vaultNamespace, podName, endpoint)
-}
-
-// checkVaultSealedStatus checks if the Vault pod is sealed.
-func (k *KubernetesWorker) checkVaultSealedStatus(podName string) (bool, error) {
-	url := k.generateURL(podName, "/v1/sys/seal-status")
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.Errorf("Check vault sealed status failed for %s: %v", podName, err)
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, err
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(body, &response); err != nil {
-		return false, err
-	}
-
-	sealed, ok := response["sealed"].(bool)
-	if !ok {
-		return false, fmt.Errorf("invalid response format")
-	}
-
-	return sealed, nil
-}
-
-// unsealVaultPod attempts to unseal the Vault pod with the provided key.
-func (k *KubernetesWorker) unsealVaultPod(podName, unsealKey string) (map[string]interface{}, error) {
-	url := k.generateURL(podName, "/v1/sys/unseal")
-	body := map[string]string{"key": unsealKey}
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		logrus.Errorf("Unseal vault failed for %s: %v", podName, err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 // loadKeysFromSecret loads and decrypts the unseal keys from the configured Kubernetes secret.
 func (k *KubernetesWorker) loadKeysFromSecret() error {
-	secret, err := k.clientset.CoreV1().Secrets(k.secretNamespace).Get(context.TODO(), k.secretName, v1.GetOptions{})
+	secret, err := k.clientset.CoreV1().Secrets(k.secretNamespace).Get(context.TODO(), k.secretName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get secret %s/%s: %v", k.secretNamespace, k.secretName, err)
 	}
@@ -228,6 +185,14 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 	return nil
 }
 
+func (k *KubernetesWorker) generateVaultURLS(podNames []string) []string {
+	var vaultURLs []string
+	for _, podName := range podNames {
+		vaultURLs = append(vaultURLs, fmt.Sprintf("http://%s.%s.%s.svc.%s:%d", podName, k.vaultServiceName, k.vaultNamespace, k.clusterDomain, k.vaultServicePort))
+	}
+	return vaultURLs
+}
+
 // Start begins the Kubernetes worker's unsealing loop, continuously checking and unsealing Vault pods.
 func (k *KubernetesWorker) Start() {
 	// Load keys from secret on startup
@@ -242,23 +207,9 @@ func (k *KubernetesWorker) Start() {
 			time.Sleep(time.Duration(k.waitInterval) * time.Second)
 			continue
 		}
-
-		for _, podName := range podNames {
-			sealed, err := k.checkVaultSealedStatus(podName)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-
-			if sealed {
-				for _, unsealKey := range k.unsealKeys {
-					_, err := k.unsealVaultPod(podName, unsealKey)
-					if err != nil {
-						logrus.Error(err)
-					}
-				}
-			}
-		}
+		vaultURLs := k.generateVaultURLS(podNames)
+		vaultClient := vault.NewClient(vaultURLs)
+		vaultClient.Run(k.unsealKeys)
 
 		time.Sleep(time.Duration(k.waitInterval) * time.Second)
 	}

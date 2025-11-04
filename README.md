@@ -41,7 +41,10 @@ The application can be configured via:
      vault_label_selector: "app.kubernetes.io/name=vault"
      pod_scan_max_counter: 5
      pod_scan_delay: 30
-   
+     vault_service_name: "vault-internal"  # optional, defaults to "vault-internal"
+     vault_service_port: 8200  # optional, defaults to 8200
+     cluster_domain: "cluster.local"  # optional, defaults to "cluster.local"
+
    # OR for HTTP mode:
    http_config:
      vault_urls:

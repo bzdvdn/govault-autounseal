@@ -32,6 +32,9 @@ type KubeConfig struct {
 	PodScanDelay       int    `yaml:"pod_scan_delay" mapstructure:"pod_scan_delay"`
 	SecretName         string `yaml:"secret_name" mapstructure:"secret_name"`
 	SecretNamespace    string `yaml:"secret_namespace" mapstructure:"secret_namespace"`
+	VaultServiceName   string `yaml:"vault_service_name" mapstructure:"vault_service_name"`
+	VaultServicePort   int    `yaml:"vault_service_port" mapstructure:"vault_service_port"`
+	ClusterDomain      string `yaml:"cluster_domain" mapstructure:"cluster_domain"`
 }
 
 // HTTPConfig holds HTTP-specific configuration for Vault unsealing.
@@ -164,6 +167,18 @@ var startCmd = &cobra.Command{
 
 		crypter := crypter.NewCrypter(config.SecretSalt)
 		if config.KubeConfig != nil {
+			vaultServiceName := config.KubeConfig.VaultServiceName
+			if vaultServiceName == "" {
+				vaultServiceName = "vault-internal"
+			}
+			vaultServicePort := config.KubeConfig.VaultServicePort
+			if vaultServicePort == 0 {
+				vaultServicePort = 8200
+			}
+			clusterDomain := config.KubeConfig.ClusterDomain
+			if clusterDomain == "" {
+				clusterDomain = "cluster.local"
+			}
 			worker := workers.NewKubernetesWorker(
 				config.KubeConfig.VaultNamespace,
 				config.KubeConfig.VaultLabelSelector,
@@ -174,6 +189,9 @@ var startCmd = &cobra.Command{
 				config.KubeConfig.SecretNamespace,
 				crypter,
 				config.SecretKey,
+				vaultServiceName,
+				vaultServicePort,
+				clusterDomain,
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {
