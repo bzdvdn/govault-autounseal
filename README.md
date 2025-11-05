@@ -4,26 +4,32 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
 
 ### Features
 
-- **Automatic Unsealing**: Continuously monitors Vault instances and unseals them when they become sealed
-- **Multi-Backend Support**: Compatible with Kubernetes environments using API proxy and standalone HTTP-based Vault deployments
-- **Encrypted Key Storage**: Securely stores unseal keys using AES encryption
-- **Configuration Flexibility**: Supports YAML configuration files and environment variables
+- **Automatic Unsealing**: Continuously monitors Vault instances and automatically unseals them when they become sealed using Shamir keys
+- **Multi-Backend Support**: Compatible with Kubernetes environments (via API proxy) and standalone HTTP-based Vault deployments
+- **Secure Key Management**: Command-line tools for encrypting and decrypting unseal keys using AES encryption with configurable salt
+- **Flexible Configuration**: Supports YAML configuration files, environment variables, and command-line flags
+- **Health Monitoring**: Built-in HTTP server for health checks and monitoring (default port 2310)
+- **Cross-Platform**: Single Go binary that runs on Linux, macOS, and Windows
+- **Docker Support**: Ready-to-use Docker image for containerized deployments
+- **Minimal Dependencies**: Uses standard Go libraries with minimal external dependencies for better security and performance
+- **Kubernetes Integration**: Native support for Kubernetes secrets and pod discovery
+- **Error Handling**: Comprehensive error handling and logging for reliable operation
 
 ### Installation
 
 #### Option 1: Build from source
 
 1. Clone the repository
-2. Run `go build ./src` to compile the binary
+2. Run `go build -o govault-autounseal ./src` to compile the binary
 3. Copy one of the example configuration files (`kube.example.yaml` or `http.example.yaml`) to `config.yaml` and modify as needed
 
 #### Option 2: Docker
 
 1. Clone the repository
 2. Build the Docker image:
-   ```bash
-   docker build -t govault-autounseal .
-   ```
+    ```bash
+    docker build -t govault-autounseal .
+    ```
 3. Copy one of the example configuration files (`kube.example.yaml` or `http.example.yaml`) to `config.yaml` and modify as needed
 
 ### Configuration
@@ -89,6 +95,14 @@ This will output an encrypted string containing your unseal keys.
 export ENC_DATA=$(cat enc-keys) && ./govault-autounseal decrypt_secret_data $ENC_DATA --config config.yaml
 ```
 
+#### Health Check
+
+The service includes a built-in HTTP server for health monitoring:
+
+```bash
+curl http://localhost:2310/health
+```
+
 #### Run the Autounseal Service
 
 ##### Using Docker
@@ -133,17 +147,26 @@ For HTTP mode, ensure the encrypted keys are specified in the `http_config.encry
 
 ### Key Differences from Python Version
 
-- **Language**: Rewritten in Go for better performance and deployment
-- **Dependencies**: Uses standard Go libraries where possible, with minimal external dependencies
-- **Error Handling**: Improved error handling and logging
-- **Configuration**: Simplified configuration loading with viper
+- **Language**: Rewritten in Go for better performance, lower memory usage, and easier deployment
+- **Dependencies**: Uses standard Go libraries where possible, with minimal external dependencies for improved security
+- **Error Handling**: Comprehensive error handling and structured logging with logrus
+- **Configuration**: Simplified configuration loading with viper, supporting YAML and environment variables
+- **Architecture**: Modular design with separate packages for encryption, secrets management, and worker implementations
+- **Security**: AES encryption for key storage with configurable salt, supporting both Kubernetes secrets and direct HTTP access
 
 ### Security Notes
 
-- Store encrypted keys securely
-- Use strong secret keys and salts
-- Ensure proper access controls for the autounseal service
+- Store encrypted keys securely and limit access to configuration files
+- Use strong, randomly generated secret keys and salts (at least 16 characters for salt)
+- Ensure proper access controls for the autounseal service and its configuration
 - Regularly rotate unseal keys and update encrypted data
+- Use HTTPS for Vault communication when possible
+- Monitor logs for unauthorized access attempts
+- Consider running the service with minimal privileges in production
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
 ### License
 

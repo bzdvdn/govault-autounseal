@@ -2,11 +2,14 @@ package workers
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"govault-autounseal/src/crypter"
 	"govault-autounseal/src/secrets"
 	"govault-autounseal/src/vault"
+	"net/http"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -107,8 +110,8 @@ func loadKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-// getVaultPodIPs retrieves the list of Vault pod IPs based on the configured label selector.
-func (k *KubernetesWorker) getVaultPodIPs() ([]string, error) {
+// getVaultPodNames retrieves the list of Vault pod Names based on the configured label selector.
+func (k *KubernetesWorker) getVaultPodNames() ([]string, error) {
 	for counter := 1; counter <= k.podScanMaxCounter; counter++ {
 		logrus.Debugf("Listing pods in namespace %s with label selector %s", k.vaultNamespace, k.vaultLabelSelector)
 		podList, err := k.clientset.CoreV1().Pods(k.vaultNamespace).List(context.TODO(), metav1.ListOptions{
@@ -138,12 +141,12 @@ func (k *KubernetesWorker) getVaultPodIPs() ([]string, error) {
 			continue
 		}
 
-		var podIPs []string
+		var podNames []string
 		for _, pod := range podList.Items {
-			podIPs = append(podIPs, pod.Status.PodIP)
+			podNames = append(podNames, pod.Name)
 		}
 
-		return podIPs, nil
+		return podNames, nil
 	}
 	return nil, fmt.Errorf("max pod scan counter reached")
 }
@@ -179,12 +182,37 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 	return nil
 }
 
-func (k *KubernetesWorker) generateVaultURLS(podIPs []string) []string {
+func (k *KubernetesWorker) generateVaultURLS(podNames []string) []string {
 	var vaultURLs []string
-	for _, podIP := range podIPs {
-		vaultURLs = append(vaultURLs, fmt.Sprintf("http://%s:%d", podIP, k.vaultPodPort))
+	for _, podName := range podNames {
+		vaultURLs = append(vaultURLs, fmt.Sprintf("%s/api/v1/namespaces/%s/pods/%s/proxy", k.config.Host, k.vaultNamespace, podName))
 	}
 	return vaultURLs
+}
+
+func (k *KubernetesWorker) getTLSConfigFromKubeconfig() (*tls.Config, error) {
+	if k.config.CertData != nil && k.config.KeyData != nil {
+		cert, err := tls.X509KeyPair(k.config.CertData, k.config.KeyData)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+
+		if k.config.CAData != nil {
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(k.config.CAData)
+			tlsConfig.RootCAs = caCertPool
+		}
+
+		return tlsConfig, nil
+	}
+
+	return &tls.Config{
+		InsecureSkipVerify: true,
+	}, nil
 }
 
 // Start begins the Kubernetes worker's unsealing loop, continuously checking and unsealing Vault pods.
@@ -195,14 +223,29 @@ func (k *KubernetesWorker) Start() {
 	}
 
 	for {
-		podIPs, err := k.getVaultPodIPs()
+		podNames, err := k.getVaultPodNames()
 		if err != nil {
 			logrus.Error(err)
 			time.Sleep(time.Duration(k.waitInterval) * time.Second)
 			continue
 		}
-		vaultURLs := k.generateVaultURLS(podIPs)
-		vaultClient := vault.NewClient(vaultURLs)
+		vaultURLs := k.generateVaultURLS(podNames)
+
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		tlsConfig, err := k.getTLSConfigFromKubeconfig()
+		if err != nil {
+			logrus.Errorf("error - %s", err)
+		} else {
+			httpClient.Transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+			}
+		}
+
+		vaultClient := vault.NewClient(vaultURLs, k.config.BearerToken, httpClient)
 		vaultClient.Run(k.unsealKeys)
 		time.Sleep(time.Duration(k.waitInterval) * time.Second)
 	}

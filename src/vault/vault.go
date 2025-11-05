@@ -13,12 +13,21 @@ import (
 
 // Client represents a Vault client for unsealing operations.
 type Client struct {
-	baseURLs []string
+	baseURLs   []string
+	authToken  string
+	httpClient *http.Client
 }
 
 // NewClient creates a new Vault client with the given base URLs.
-func NewClient(baseURLs []string) *Client {
-	return &Client{baseURLs: baseURLs}
+func NewClient(baseURLs []string, authToken string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+	}
+	return &Client{baseURLs: baseURLs, authToken: authToken, httpClient: httpClient}
 }
 
 // CheckSealStatus checks if Vault is sealed by querying the first available URL.
@@ -30,14 +39,10 @@ func (c *Client) CheckSealStatus(baseURL string) (*SealStatus, error) {
 		logrus.Errorf("Failed to create request for %s: %v", url, err)
 		return nil, err
 	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
 	}
-
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("HTTP request failed for %s: %v", url, err)
 		return nil, err
@@ -82,14 +87,10 @@ func (c *Client) Unseal(baseURL string, key string) (*UnsealResponse, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
 	}
-
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("HTTP unseal request failed for %s: %v", url, err)
 		return nil, err

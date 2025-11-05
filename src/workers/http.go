@@ -17,7 +17,7 @@ func NewHTTPWorker(
 	waitInterval int,
 ) *HTTPWorker {
 	return &HTTPWorker{
-		client:       vault.NewClient(vaultURLs),
+		client:       vault.NewClient(vaultURLs, "", nil),
 		waitInterval: waitInterval,
 	}
 }
