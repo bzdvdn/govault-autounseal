@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "govault-autounseal.fullname" . }}
+  labels:
+    {{- include "govault-autounseal.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    wait_interval: {{ .Values.config.wait_interval }}
+    secret_key: {{ .Values.config.secret_key | quote }}
+    secret_salt: {{ .Values.config.secret_salt | quote }}
+    http_server:
+      port: {{ .Values.config.http_server.port }}
+    {{- if eq .Values.mode "kube" }}
+    kube_config:
+      vault_namespace: {{ .Values.kubeConfig.vault_namespace | quote }}
+      vault_label_selector: {{ .Values.kubeConfig.vault_label_selector | quote }}
+      pod_scan_max_counter: {{ .Values.kubeConfig.pod_scan_max_counter }}
+      pod_scan_delay: {{ .Values.kubeConfig.pod_scan_delay }}
+      secret_name: {{ include "govault-autounseal.fullname" . }}-keys
+      secret_namespace: {{ .Release.Namespace | quote }}
+      vault_pod_port: {{ .Values.kubeConfig.vault_pod_port }}
+    {{- else if eq .Values.mode "http" }}
+    http_config:
+      vault_urls:
+      {{- range .Values.httpConfig.vault_urls }}
+        - {{ . | quote }}
+      {{- end }}
+      encrypted_keys: {{ .Values.httpConfig.encrypted_keys | quote }}
+    {{- end }}

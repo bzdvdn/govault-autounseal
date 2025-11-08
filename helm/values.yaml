@@ -1,0 +1,75 @@
+# Default values for govault-autounseal.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: govault-autounseal
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Application configuration
+config:
+  wait_interval: 30
+  secret_key: "change-this-key"
+  secret_salt: "change-this-salt-16-chars"
+  http_server:
+    port: 2310
+
+# Mode: "kube" or "http"
+mode: "kube"
+
+# Kubernetes mode configuration
+kubeConfig:
+  vault_namespace: "vault"
+  vault_label_selector: "app.kubernetes.io/name=vault"
+  pod_scan_max_counter: 5
+  pod_scan_delay: 30
+  secret_name: "vault-unseal-keys"
+  secret_namespace: "vault"
+  vault_pod_port: 8200
+
+# HTTP mode configuration
+httpConfig:
+  vault_urls: []
+  encrypted_keys: ""
+
+# Encrypted keys for the secret (base64 encoded)
+encryptedKeys: ""
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# RBAC
+rbac:
+  create: true
+
+# Service
+service:
+  type: ClusterIP
+  port: 2310
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 254Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
