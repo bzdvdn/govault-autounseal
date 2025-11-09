@@ -15,13 +15,17 @@ image:
 # Application configuration
 config:
   wait_interval: 30
-  secret_key: "change-this-key"
-  secret_salt: "change-this-salt-16-chars"
+  encrypted_keys: "" #required
   http_server:
     port: 2310
 
 # Mode: "kube" or "http"
 mode: "kube"
+
+encryptionSecret:
+  enabled: false
+  secretKey: "your-secret-key"
+  secretSalt: "your-salt-16-chars"
 
 # Kubernetes mode configuration
 kubeConfig:
@@ -36,10 +40,8 @@ kubeConfig:
 # HTTP mode configuration
 httpConfig:
   vault_urls: []
-  encrypted_keys: ""
-
-# Encrypted keys for the secret (base64 encoded)
-encryptedKeys: ""
+  secret_key: "change-this-key"
+  secret_salt: "change-this-salt-16-chars"
 
 # Service account
 serviceAccount:

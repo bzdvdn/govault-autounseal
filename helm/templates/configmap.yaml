@@ -7,8 +7,7 @@ metadata:
 data:
   config.yaml: |
     wait_interval: {{ .Values.config.wait_interval }}
-    secret_key: {{ .Values.config.secret_key | quote }}
-    secret_salt: {{ .Values.config.secret_salt | quote }}
+    encrypted_keys: {{ .Values.config.encrypted_keys | quote }}
     http_server:
       port: {{ .Values.config.http_server.port }}
     {{- if eq .Values.mode "kube" }}
@@ -17,7 +16,11 @@ data:
       vault_label_selector: {{ .Values.kubeConfig.vault_label_selector | quote }}
       pod_scan_max_counter: {{ .Values.kubeConfig.pod_scan_max_counter }}
       pod_scan_delay: {{ .Values.kubeConfig.pod_scan_delay }}
+      {{- if .Values.encryptionSecret.enabled }}
       secret_name: {{ include "govault-autounseal.fullname" . }}-keys
+      {{- else }}
+      secret_name: {{ .Values.kubeConfig.secret_name }}
+      {{- end }}
       secret_namespace: {{ .Release.Namespace | quote }}
       vault_pod_port: {{ .Values.kubeConfig.vault_pod_port }}
     {{- else if eq .Values.mode "http" }}
@@ -26,5 +29,6 @@ data:
       {{- range .Values.httpConfig.vault_urls }}
         - {{ . | quote }}
       {{- end }}
-      encrypted_keys: {{ .Values.httpConfig.encrypted_keys | quote }}
+      secret_key: {{ .Values.httpConfig.secret_key | quote }}
+      secret_salt: {{ .Values.httpConfig.secret_salt | quote }}
     {{- end }}
