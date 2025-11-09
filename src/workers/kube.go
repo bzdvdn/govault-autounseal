@@ -31,8 +31,7 @@ type KubernetesWorker struct {
 	waitInterval       int
 	secretName         string
 	secretNamespace    string
-	crypter            *crypter.Crypter
-	secretKey          string
+	EncryptedKeys      string
 	vaultPodPort       int
 }
 
@@ -45,8 +44,7 @@ func NewKubernetesWorker(
 	waitInterval int,
 	secretName string,
 	secretNamespace string,
-	crypter *crypter.Crypter,
-	secretKey string,
+	EncryptedKeys string,
 	vaultPodPort int,
 ) *KubernetesWorker {
 	config, err := loadKubeConfig()
@@ -69,8 +67,7 @@ func NewKubernetesWorker(
 		waitInterval:       waitInterval,
 		secretName:         secretName,
 		secretNamespace:    secretNamespace,
-		crypter:            crypter,
-		secretKey:          secretKey,
+		EncryptedKeys:      EncryptedKeys,
 		vaultPodPort:       vaultPodPort,
 	}
 }
@@ -158,12 +155,16 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 		return fmt.Errorf("failed to get secret %s/%s: %v", k.secretNamespace, k.secretName, err)
 	}
 
-	encryptedKeys, ok := secret.Data["encrypted-keys"]
+	secretKey, ok := secret.Data["secret-key"]
 	if !ok {
-		return fmt.Errorf("encrypted-keys key not found in secret %s/%s", k.secretNamespace, k.secretName)
+		return fmt.Errorf("secret-key key not found in secret %s/%s", k.secretNamespace, k.secretName)
 	}
-
-	decryptedKeys, err := k.crypter.Decrypt(string(encryptedKeys), k.secretKey)
+	secretSalt, ok := secret.Data["secret-salt"]
+	if !ok {
+		return fmt.Errorf("secret-salt key not found in secret %s/%s", k.secretNamespace, k.secretName)
+	}
+	crypter := crypter.NewCrypter(string(secretSalt))
+	decryptedKeys, err := crypter.Decrypt(k.EncryptedKeys, string(secretKey))
 	if err != nil {
 		return fmt.Errorf("failed to decrypt keys: %v", err)
 	}

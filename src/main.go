@@ -18,12 +18,11 @@ import (
 
 // Config holds the application configuration loaded from YAML file.
 type Config struct {
-	WaitInterval int         `yaml:"wait_interval" mapstructure:"wait_interval"`
-	SecretKey    string      `yaml:"secret_key" mapstructure:"secret_key"`
-	SecretSalt   string      `yaml:"secret_salt" mapstructure:"secret_salt"`
-	KubeConfig   *KubeConfig `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
-	HTTPConfig   *HTTPConfig `yaml:"http_config,omitempty" mapstructure:"http_config"`
-	HTTPServer   *HTTPServer `yaml:"http_server,omitempty" mapstructure:"http_server"`
+	WaitInterval  int         `yaml:"wait_interval" mapstructure:"wait_interval"`
+	EncryptedKeys string      `yaml:"encrypted_keys" mapstructure:"encrypted_keys"`
+	KubeConfig    *KubeConfig `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
+	HTTPConfig    *HTTPConfig `yaml:"http_config,omitempty" mapstructure:"http_config"`
+	HTTPServer    *HTTPServer `yaml:"http_server,omitempty" mapstructure:"http_server"`
 }
 
 // HTTPServer holds HTTP server configuration for health checks.
@@ -44,10 +43,11 @@ type KubeConfig struct {
 
 // HTTPConfig holds HTTP-specific configuration for Vault unsealing.
 type HTTPConfig struct {
-	VaultURLs     []string `yaml:"vault_urls" mapstructure:"vault_urls"`
-	Username      *string  `yaml:"username,omitempty" mapstructure:"username"`
-	Password      *string  `yaml:"password,omitempty" mapstructure:"password"`
-	EncryptedKeys string   `yaml:"encrypted_keys" mapstructure:"encrypted_keys"`
+	VaultURLs  []string `yaml:"vault_urls" mapstructure:"vault_urls"`
+	Username   *string  `yaml:"username,omitempty" mapstructure:"username"`
+	Password   *string  `yaml:"password,omitempty" mapstructure:"password"`
+	SecretKey  string   `yaml:"secret_key" mapstructure:"secret_key"`
+	SecretSalt string   `yaml:"secret_salt" mapstructure:"secret_salt"`
 }
 
 // loadConfig loads and parses the configuration from YAML file or environment variables.
@@ -86,12 +86,8 @@ var createSecretDataCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		base64VaultJsonKeys := args[0]
-		configPath, _ := cmd.Flags().GetString("config")
-
-		config, err := loadConfig(configPath)
-		if err != nil {
-			log.Fatalf("Failed to load config: %v", err)
-		}
+		secretKey, _ := cmd.Flags().GetString("secret-key")
+		secretSalt, _ := cmd.Flags().GetString("secret-salt")
 
 		data, err := base64.StdEncoding.DecodeString(base64VaultJsonKeys)
 		if err != nil {
@@ -118,8 +114,8 @@ var createSecretDataCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to marshal data: %v", err)
 		}
-		crypter := crypter.NewCrypter(config.SecretSalt)
-		encrypted, err := crypter.Encrypt(string(keysJson), config.SecretKey)
+		crypter := crypter.NewCrypter(secretSalt)
+		encrypted, err := crypter.Encrypt(string(keysJson), secretKey)
 		if err != nil {
 			log.Fatalf("Failed to encrypt: %v", err)
 		}
@@ -133,14 +129,11 @@ var decryptSecretDataCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
-		configPath, _ := cmd.Flags().GetString("config")
+		secretKey, _ := cmd.Flags().GetString("secret-key")
+		secretSalt, _ := cmd.Flags().GetString("secret-salt")
 
-		config, err := loadConfig(configPath)
-		if err != nil {
-			log.Fatalf("Failed to load config: %v", err)
-		}
-		crypter := crypter.NewCrypter(config.SecretSalt)
-		decrypted, err := crypter.Decrypt(key, config.SecretKey)
+		crypter := crypter.NewCrypter(secretSalt)
+		decrypted, err := crypter.Decrypt(key, secretKey)
 		if err != nil {
 			log.Fatalf("Failed to decrypt: %v", err)
 		}
@@ -187,14 +180,15 @@ var startCmd = &cobra.Command{
 			log.Fatalf("Failed to load config: %v", err)
 		}
 
+		if config.EncryptedKeys == "" {
+			log.Fatalf("encrypted_keys is required for application")
+		}
 		// Start HTTP server (always enabled, default port 2310)
 		port := 2310
 		if config.HTTPServer != nil && config.HTTPServer.Port != 0 {
 			port = config.HTTPServer.Port
 		}
 		go startHTTPServer(port)
-
-		crypter := crypter.NewCrypter(config.SecretSalt)
 		if config.KubeConfig != nil {
 			vaultPodPort := config.KubeConfig.VaultPodPort
 			if vaultPodPort == 0 {
@@ -208,17 +202,13 @@ var startCmd = &cobra.Command{
 				config.WaitInterval,
 				config.KubeConfig.SecretName,
 				config.KubeConfig.SecretNamespace,
-				crypter,
-				config.SecretKey,
+				config.EncryptedKeys,
 				vaultPodPort,
 			)
 			worker.Start()
 		} else if config.HTTPConfig != nil {
-			if config.HTTPConfig.EncryptedKeys == "" {
-				log.Fatalf("encrypted_keys is required for HTTP config")
-			}
-
-			decrypted, err := crypter.Decrypt(config.HTTPConfig.EncryptedKeys, config.SecretKey)
+			crypter := crypter.NewCrypter(config.HTTPConfig.SecretSalt)
+			decrypted, err := crypter.Decrypt(config.EncryptedKeys, config.HTTPConfig.SecretKey)
 			if err != nil {
 				log.Fatalf("Failed to decrypt encrypted keys: %v", err)
 			}
@@ -244,7 +234,11 @@ func init() {
 	rootCmd.AddCommand(decryptSecretDataCmd)
 	rootCmd.AddCommand(startCmd)
 
+	createSecretDataCmd.Flags().String("secret-key", "", "Secret key for encryption")
+	createSecretDataCmd.Flags().String("secret-salt", "", "Secret salt for encryption")
 	createSecretDataCmd.Flags().String("config", "", "Path to config file")
+	decryptSecretDataCmd.Flags().String("secret-key", "", "Secret key for decryption")
+	decryptSecretDataCmd.Flags().String("secret-salt", "", "Secret salt for decryption")
 	decryptSecretDataCmd.Flags().String("config", "", "Path to config file")
 	startCmd.Flags().String("config", "", "Path to config file")
 }
