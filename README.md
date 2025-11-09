@@ -86,8 +86,8 @@ The application can be configured via:
 First, encrypt your unseal keys from the Vault init response. Encode the JSON content of keys.json as base64 and pass it as an argument:
 
 ```bash
-export SECRET_KEY="your-secret-key"
-export SECRET_SALT="your-salt-16-chars"
+export SECRET_KEY="test-keys-2310"
+export SECRET_SALT="a3F8pLzQ9vXbR2mN"
 export KEYS_B64=$(base64 -w 0 keys.example.json) && ./govault-autounseal create_secret_data $KEYS_B64 --secret-key $SECRET_KEY --secret-salt $SECRET_SALT > enc-keys
 ```
 
@@ -96,8 +96,8 @@ This will output an encrypted string containing your unseal keys.
 #### Decrypt Keys (for verification)
 
 ```bash
-export SECRET_KEY="your-secret-key"
-export SECRET_SALT="your-salt-16-chars"
+export SECRET_KEY="test-keys-2310"
+export SECRET_SALT="a3F8pLzQ9vXbR2mN"
 export ENC_DATA=$(cat enc-keys) && ./govault-autounseal decrypt_secret_data $ENC_DATA --secret-key $SECRET_KEY --secret-salt $SECRET_SALT
 ```
 

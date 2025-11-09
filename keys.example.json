@@ -1,21 +1,23 @@
 {
-    "keys": [
-        "2a6c1d5e3b8e9f1a7d4c2b8e3f6a9d1e4b7c8f2a5d3e6b9f0c1d2e3f4a5b6c7d8e9f0"
-    ],
-    "keys_base64": [
-        "KmwdXjuOnxp9TCuOP2qdHkt8jypePmufDB0uP0pbZ8fYnw=="
-    ],
-    "root_token": "hvs.CAESIIlCwXcJZJN9Z2x2ZnV3Z3h5eip8fYGBgoOEhYaHiIiJiqALMApBUXVxVlVXc3h6e3x9fn-AwMQ",
     "unseal_keys_b64": [
-        "KmwdXjuOnxp9TCuOP2qdHkt8jypePmufDB0uP0pbZ8fYnw=="
+        "gRIqUNwir/2OL4Hm+xO6gDWHYS02/DdvHFgHthdJHeSY",
+        "+rXjon8aZiFxpm6E470pwdbq2npJ+BzTwyne1OhkvLmy",
+        "xA2J95MogDsqjXEhPGlLnQgS6rFh50XugXkcCRsJo2bm",
+        "Qd9qHudXNgPoCSmdFTeuQxcLHUdmHm2b+zGsDnvt5ipN",
+        "NixBZu7yvrDXYOGL92Rc+MBuq94SlWX2qyKGk/HRJMMo"
     ],
     "unseal_keys_hex": [
-        "2a6c1d5e3b8e9f1a7d4c2b8e3f6a9d1e4b7c8f2a5d3e6b9f0c1d2e3f4a5b6c7d8e9f0"
+        "81122a50dc22affd8e2f81e6fb13ba803587612d36fc376f1c5807b617491de498",
+        "fab5e3a27f1a662171a66e84e3bd29c1d6eada7a49f81cd3c329ded4e864bcb9b2",
+        "c40d89f79328803b2a8d71213c694b9d0812eab161e745ee81791c091b09a366e6",
+        "41df6a1ee7573603e809299d1537ae43170b1d47661e6d9bfb31ac0e7bede62a4d",
+        "362c4166eef2beb0d760e18bf7645cf8c06eabde129565f6ab228693f1d124c328"
     ],
-    "recovery_keys_b64": [
-        "TI0+d5oLCx0+T1p2x43o8aKzxNXm96i5wNHi80pWx48="
-    ],
-    "recovery_keys_hex": [
-        "4c8d3e7f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f"
-    ]
+    "unseal_shares": 5,
+    "unseal_threshold": 3,
+    "recovery_keys_b64": [],
+    "recovery_keys_hex": [],
+    "recovery_keys_shares": 5,
+    "recovery_keys_threshold": 3,
+    "root_token": "s.T2BLY11KUSAOO7z7jQeo3rXv"
 }

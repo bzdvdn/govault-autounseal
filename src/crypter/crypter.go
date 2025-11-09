@@ -16,17 +16,17 @@ type aesCipher struct {
 	iv    []byte
 }
 
-// encrypt encrypts the given data using AES CFB mode.
+// encrypt encrypts the given data using AES CTR mode.
 func (a *aesCipher) encrypt(data []byte) []byte {
-	stream := cipher.NewCFBEncrypter(a.block, a.iv)
+	stream := cipher.NewCTR(a.block, a.iv)
 	encrypted := make([]byte, len(data))
 	stream.XORKeyStream(encrypted, data)
 	return encrypted
 }
 
-// decrypt decrypts the given data using AES CFB mode.
+// decrypt decrypts the given data using AES CTR mode.
 func (a *aesCipher) decrypt(data []byte) []byte {
-	stream := cipher.NewCFBDecrypter(a.block, a.iv)
+	stream := cipher.NewCTR(a.block, a.iv)
 	decrypted := make([]byte, len(data))
 	stream.XORKeyStream(decrypted, data)
 	return decrypted
