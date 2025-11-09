@@ -30,52 +30,54 @@ This is a Go port of the Python Vault autounseal tool. It provides automatic uns
     ```bash
     docker build -t govault-autounseal .
     ```
-3. Copy one of the example configuration files (`kube.example.yaml` or `http.example.yaml`) to `config.yaml` and modify as needed
+3. Copy the example configuration file (`config.example.yaml`) to `config.yaml` and modify as needed
 
 ### Configuration
 
 The application can be configured via:
 
 1. **YAML Configuration File** (`config.yaml`):
-   ```yaml
-   wait_interval: 30
-   secret_key: "your-secret-key"
-   secret_salt: "your-salt-16-chars"
-   
-   kube_config:
-     vault_namespace: "vault"
-     vault_label_selector: "app.kubernetes.io/name=vault"
-     pod_scan_max_counter: 5
-     pod_scan_delay: 30
-     secret_name: "vault-unseal-keys"
-     secret_namespace: "vault"
-     vault_pod_port: 8200  # optional, defaults to 8200
+    ```yaml
+    # Global settings
+    wait_interval: 30
+    encrypted_keys: "your-encrypted-keys-here"
 
-   # OR for HTTP mode:
-   http_config:
-      vault_urls:
-        - "https://vault.example.com:8200"
-      encrypted_keys: "WyJ0ZXN0Il0K" # base64 encoded ["test"]
+    # Kubernetes configuration (uncomment and modify for kube mode)
+    kube_config:
+      vault_namespace: "vault"
+      vault_label_selector: "app.kubernetes.io/name=vault"
+      pod_scan_max_counter: 5
+      pod_scan_delay: 30
+      secret_name: "vault-unseal-keys"
+      secret_namespace: "vault"
+      vault_pod_port: 8200
 
-   # HTTP server configuration for health checks (always enabled, default port 2310)
-   http_server:
-     port: 2310
-   ```
+    # OR for HTTP mode:
+    http_config:
+       vault_urls:
+         - "https://vault.example.com:8200"
+       secret_key: "your-secret-key"
+       secret_salt: "your-salt-16-chars"
+
+    # HTTP server configuration for health checks (always enabled, default port 2310)
+    http_server:
+      port: 2310
+    ```
 
 2. **Environment Variables**:
-     - `VAULT_WAIT_INTERVAL`
-     - `VAULT_SECRET_KEY`
-     - `VAULT_SECRET_SALT`
-     - `VAULT_ENCRYPTED_KEYS`
-     - `VAULT_KUBE_NAMESPACE`
-     - `VAULT_KUBE_LABEL_SELECTOR`
-     - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
-     - `VAULT_KUBE_POD_SCAN_DELAY`
-     - `VAULT_KUBE_SECRET_NAME`
-     - `VAULT_KUBE_SECRET_NAMESPACE`
-     - `VAULT_KUBE_VAULT_POD_PORT`
-     - `VAULT_HTTP_URLS`
-     - `VAULT_HTTP_SERVER_PORT`
+      - `VAULT_WAIT_INTERVAL`
+      - `VAULT_ENCRYPTED_KEYS`
+      - `VAULT_KUBE_NAMESPACE`
+      - `VAULT_KUBE_LABEL_SELECTOR`
+      - `VAULT_KUBE_POD_SCAN_MAX_COUNTER`
+      - `VAULT_KUBE_POD_SCAN_DELAY`
+      - `VAULT_KUBE_SECRET_NAME`
+      - `VAULT_KUBE_SECRET_NAMESPACE`
+      - `VAULT_KUBE_VAULT_POD_PORT`
+      - `VAULT_HTTP_URLS`
+      - `VAULT_HTTP_SECRET_KEY`
+      - `VAULT_HTTP_SECRET_SALT`
+      - `VAULT_HTTP_SERVER_PORT`
 
 ### Usage
 
@@ -84,7 +86,9 @@ The application can be configured via:
 First, encrypt your unseal keys from the Vault init response. Encode the JSON content of keys.json as base64 and pass it as an argument:
 
 ```bash
-export KEYS_B64=$(base64 -w 0 keys.example.json) && ./govault-autounseal create_secret_data $KEYS_B64 --config config.yaml > enc-keys
+export SECRET_KEY="your-secret-key"
+export SECRET_SALT="your-salt-16-chars"
+export KEYS_B64=$(base64 -w 0 keys.example.json) && ./govault-autounseal create_secret_data $KEYS_B64 --secret-key $SECRET_KEY --secret-salt $SECRET_SALT > enc-keys
 ```
 
 This will output an encrypted string containing your unseal keys.
@@ -92,7 +96,9 @@ This will output an encrypted string containing your unseal keys.
 #### Decrypt Keys (for verification)
 
 ```bash
-export ENC_DATA=$(cat enc-keys) && ./govault-autounseal decrypt_secret_data $ENC_DATA --config config.yaml
+export SECRET_KEY="your-secret-key"
+export SECRET_SALT="your-salt-16-chars"
+export ENC_DATA=$(cat enc-keys) && ./govault-autounseal decrypt_secret_data $ENC_DATA --secret-key $SECRET_KEY --secret-salt $SECRET_SALT
 ```
 
 #### Health Check
@@ -107,10 +113,13 @@ curl http://localhost:2310/health
 
 ##### Using Docker
 
-For Kubernetes mode, create a secret with the encrypted keys:
+For Kubernetes mode, create a secret with the encrypted keys, secret key, and secret salt:
 
 ```bash
-kubectl create secret generic vault-unseal-keys --from-literal=encrypted-keys="your-encrypted-keys" -n vault
+kubectl create secret generic vault-unseal-keys \
+  --from-literal=secret-key="your-secret-key" \
+  --from-literal=secret-salt="your-salt-16-chars" \
+  -n vault
 ```
 
 Then run the service with Docker:
@@ -119,18 +128,21 @@ Then run the service with Docker:
 docker run -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
 ```
 
-For HTTP mode, set the encrypted keys as an environment variable:
+For HTTP mode, ensure the encrypted keys are specified in the `encrypted_keys` field of your `config.yaml` file, then run the service:
 
 ```bash
-docker run -e VAULT_ENCRYPTED_KEYS="your-encrypted-keys" -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
+docker run -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
 ```
 
 ##### Using Binary
 
-For Kubernetes mode, create a secret with the encrypted keys:
+For Kubernetes mode, create a secret with the encrypted keys, secret key, and secret salt:
 
 ```bash
-kubectl create secret generic vault-unseal-keys --from-literal=encrypted-keys="your-encrypted-keys" -n vault
+kubectl create secret generic vault-unseal-keys \
+  --from-literal=secret-key="your-secret-key" \
+  --from-literal=secret-salt="your-salt-16-chars" \
+  -n vault
 ```
 
 Then run the service:
@@ -139,20 +151,11 @@ Then run the service:
 ./govault-autounseal start --config config.yaml
 ```
 
-For HTTP mode, ensure the encrypted keys are specified in the `http_config.encrypted_keys` field of your `config.yaml` file, then run the service:
+For HTTP mode, ensure the encrypted keys are specified in the `encrypted_keys` field of your `config.yaml` file, then run the service:
 
 ```bash
 ./govault-autounseal start --config config.yaml
 ```
-
-### Key Differences from Python Version
-
-- **Language**: Rewritten in Go for better performance, lower memory usage, and easier deployment
-- **Dependencies**: Uses standard Go libraries where possible, with minimal external dependencies for improved security
-- **Error Handling**: Comprehensive error handling and structured logging with logrus
-- **Configuration**: Simplified configuration loading with viper, supporting YAML and environment variables
-- **Architecture**: Modular design with separate packages for encryption, secrets management, and worker implementations
-- **Security**: AES encryption for key storage with configurable salt, supporting both Kubernetes secrets and direct HTTP access
 
 ### Security Notes
 

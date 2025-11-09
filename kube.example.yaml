@@ -1,0 +1,27 @@
+# Configuration file for govault-autounseal
+# This file contains example configuration for Kubernetes mode
+
+# Global settings
+wait_interval: 30
+encrypted_keys: "your-encrypted-keys-here"
+
+# Kubernetes configuration (uncomment and modify for kube mode)
+kube_config:
+  vault_namespace: "vault"
+  vault_label_selector: "app.kubernetes.io/name=vault"
+  pod_scan_max_counter: 5
+  pod_scan_delay: 30
+  secret_name: "vault-unseal-keys"
+  secret_namespace: "vault"
+  vault_pod_port: 8200
+
+# HTTP configuration (uncomment and modify for HTTP mode)
+# http_config:
+#   vault_urls:
+#     - "https://vault.example.com:8200"
+#   secret_key: "your-secret-key"
+#   secret_salt: "your-salt-16-chars"
+
+# HTTP server configuration for health checks (always enabled, default port 2310)
+http_server:
+  port: 2310
