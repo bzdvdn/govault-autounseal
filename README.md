@@ -117,6 +117,7 @@ http_server:
 
 ### Encrypt Unseal Keys
 
+#### Using Binary
 ```bash
 export VA_SECRET_KEY="your-secret-key"
 export VA_SECRET_SALT="your-16-char-salt"
@@ -124,12 +125,33 @@ export KEYS_B64=$(base64 -w 0 keys.example.json)
 ./govault-autounseal create_secret_data $KEYS_B64 --secret-key $VA_SECRET_KEY --secret-salt $VA_SECRET_SALT > enc-keys
 ```
 
+#### Using Docker
+```bash
+export VA_SECRET_KEY="your-secret-key"
+export VA_SECRET_SALT="your-16-char-salt"
+export KEYS_B64=$(base64 -w 0 keys.example.json)
+docker run --rm -e VA_SECRET_KEY=$VA_SECRET_KEY -e VA_SECRET_SALT=$VA_SECRET_SALT \
+  -v $(pwd)/keys.example.json:/tmp/keys.example.json \
+  bzdvdn/govault-autounseal create_secret_data $KEYS_B64 \
+  --secret-key $VA_SECRET_KEY --secret-salt $VA_SECRET_SALT > enc-keys
+```
+
 ### Decrypt Keys (Verification)
 
+#### Using Binary
 ```bash
 export VA_SECRET_KEY="your-secret-key"
 export VA_SECRET_SALT="your-16-char-salt"
 ./govault-autounseal decrypt_secret_data $(cat enc-keys) --secret-key $VA_SECRET_KEY --secret-salt $VA_SECRET_SALT
+```
+
+#### Using Docker
+```bash
+export VA_SECRET_KEY="your-secret-key"
+export VA_SECRET_SALT="your-16-char-salt"
+docker run --rm -e VA_SECRET_KEY=$VA_SECRET_KEY -e VA_SECRET_SALT=$VA_SECRET_SALT \
+  bzdvdn/govault-autounseal decrypt_secret_data $(cat enc-keys) \
+  --secret-key $VA_SECRET_KEY --secret-salt $VA_SECRET_SALT
 ```
 
 ### Health Check
@@ -142,7 +164,7 @@ curl http://localhost:2310/health
 
 #### Docker
 ```bash
-docker run -v $(pwd)/config.yaml:/root/config.yaml govault-autounseal start --config /root/config.yaml
+docker run -v $(pwd)/config.yaml:/root/config.yaml bzdvdn/govault-autounseal start --config /root/config.yaml
 ```
 
 #### Binary

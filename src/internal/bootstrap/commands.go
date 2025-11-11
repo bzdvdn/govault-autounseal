@@ -10,7 +10,7 @@ import (
 	"govault-autounseal/src/internal/config"
 	"govault-autounseal/src/internal/http"
 	"govault-autounseal/src/internal/vault"
-	"govault-autounseal/src/internal/workers"
+	"govault-autounseal/src/internal/worker"
 	"govault-autounseal/src/pkg/crypter"
 
 	"github.com/spf13/cobra"
@@ -127,7 +127,7 @@ var startCmd = &cobra.Command{
 			if vaultPodPort == 0 {
 				vaultPodPort = 8200
 			}
-			worker := workers.NewKubernetesWorker(
+			worker := worker.NewKubernetesWorker(
 				cfg.KubeConfig.VaultNamespace,
 				cfg.KubeConfig.VaultLabelSelector,
 				cfg.KubeConfig.PodScanMaxCounter,
@@ -139,7 +139,7 @@ var startCmd = &cobra.Command{
 			)
 			worker.Start()
 		} else if cfg.HTTPConfig != nil {
-			worker := workers.NewHTTPWorker(
+			worker := worker.NewHTTPWorker(
 				cfg.HTTPConfig.VaultURLs,
 				cfg.WaitInterval,
 				store,
