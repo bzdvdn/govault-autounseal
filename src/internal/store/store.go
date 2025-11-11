@@ -1,4 +1,4 @@
-package secrets
+package store
 
 type SecretStoreInteface interface {
 	SecretKey() string

@@ -9,9 +9,9 @@ import (
 
 	"govault-autounseal/src/internal/config"
 	"govault-autounseal/src/internal/http"
+	"govault-autounseal/src/internal/vault"
 	"govault-autounseal/src/internal/workers"
 	"govault-autounseal/src/pkg/crypter"
-	"govault-autounseal/src/secrets"
 
 	"github.com/spf13/cobra"
 )
@@ -51,7 +51,7 @@ var createSecretDataCmd = &cobra.Command{
 			keysStr[i] = k.(string)
 		}
 
-		encryptedData := secrets.EncryptedData{Keys: keysStr}
+		encryptedData := vault.EncryptedData{Keys: keysStr}
 		keysJson, err := encryptedData.Marshal()
 		if err != nil {
 			log.Fatalf("Failed to marshal data: %v", err)
@@ -79,7 +79,7 @@ var decryptSecretDataCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to decrypt: %v", err)
 		}
-		var encryptedData secrets.EncryptedData
+		var encryptedData vault.EncryptedData
 		if err := encryptedData.Unmarshal([]byte(decrypted)); err != nil {
 			// Try to unmarshal as old format (array of strings)
 			var keys []string
@@ -102,54 +102,49 @@ var startCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
 
-		config, err := config.LoadConfig(configPath)
+		cfg, err := config.LoadConfig(configPath)
 		if err != nil {
 			log.Fatalf("Failed to load config: %v", err)
 		}
 
-		if config.EncryptedKeys == "" {
+		if cfg.EncryptedKeys == "" {
 			log.Fatalf("encrypted_keys is required for application")
 		}
+
+		store, err := cfg.CreateStore()
+		if err != nil {
+			log.Fatalf("Failed to create store: %v", err)
+		}
+
 		// Start HTTP server (always enabled, default port 2310)
 		port := 2310
-		if config.HTTPServer != nil && config.HTTPServer.Port != 0 {
-			port = config.HTTPServer.Port
+		if cfg.HTTPServer != nil && cfg.HTTPServer.Port != 0 {
+			port = cfg.HTTPServer.Port
 		}
 		go http.StartHTTPServer(port)
-		if config.KubeConfig != nil {
-			vaultPodPort := config.KubeConfig.VaultPodPort
+		if cfg.KubeConfig != nil {
+			vaultPodPort := cfg.KubeConfig.VaultPodPort
 			if vaultPodPort == 0 {
 				vaultPodPort = 8200
 			}
 			worker := workers.NewKubernetesWorker(
-				config.KubeConfig.VaultNamespace,
-				config.KubeConfig.VaultLabelSelector,
-				config.KubeConfig.PodScanMaxCounter,
-				config.KubeConfig.PodScanDelay,
-				config.WaitInterval,
-				config.KubeConfig.SecretName,
-				config.KubeConfig.SecretNamespace,
-				config.EncryptedKeys,
+				cfg.KubeConfig.VaultNamespace,
+				cfg.KubeConfig.VaultLabelSelector,
+				cfg.KubeConfig.PodScanMaxCounter,
+				cfg.KubeConfig.PodScanDelay,
+				cfg.WaitInterval,
+				store,
+				cfg.EncryptedKeys,
 				vaultPodPort,
 			)
 			worker.Start()
-		} else if config.HTTPConfig != nil {
-			crypter := crypter.NewCrypter(config.HTTPConfig.SecretSalt)
-			decrypted, err := crypter.Decrypt(config.EncryptedKeys, config.HTTPConfig.SecretKey)
-			if err != nil {
-				log.Fatalf("Failed to decrypt encrypted keys: %v", err)
-			}
-
-			var encryptedData secrets.EncryptedData
-			if err := encryptedData.Unmarshal([]byte(decrypted)); err != nil {
-				log.Fatalf("Failed to unmarshal decrypted keys: %v", err)
-			}
-
+		} else if cfg.HTTPConfig != nil {
 			worker := workers.NewHTTPWorker(
-				config.HTTPConfig.VaultURLs,
-				config.WaitInterval,
+				cfg.HTTPConfig.VaultURLs,
+				cfg.WaitInterval,
+				store,
 			)
-			worker.Start(encryptedData.Keys)
+			worker.Start(cfg.EncryptedKeys)
 		} else {
 			log.Fatalf("No worker configuration found")
 		}

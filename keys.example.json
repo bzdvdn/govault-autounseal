@@ -18,6 +18,5 @@
     "recovery_keys_b64": [],
     "recovery_keys_hex": [],
     "recovery_keys_shares": 5,
-    "recovery_keys_threshold": 3,
-    "root_token": "s.T2BLY11KUSAOO7z7jQeo3rXv"
+    "recovery_keys_threshold": 3
 }

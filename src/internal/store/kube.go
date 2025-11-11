@@ -1,9 +1,9 @@
-package secrets
+package store
 
 import (
 	"context"
 	"fmt"
-	"govault-autounseal/src/utils"
+	"govault-autounseal/src/pkg/utils"
 
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -1,16 +1,21 @@
 package config
 
 import (
+	"fmt"
+
+	storePkg "govault-autounseal/src/internal/store"
+
 	"github.com/spf13/viper"
 )
 
 // Config holds the application configuration loaded from YAML file.
 type Config struct {
-	WaitInterval  int         `yaml:"wait_interval" mapstructure:"wait_interval"`
-	EncryptedKeys string      `yaml:"encrypted_keys" mapstructure:"encrypted_keys"`
-	KubeConfig    *KubeConfig `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
-	HTTPConfig    *HTTPConfig `yaml:"http_config,omitempty" mapstructure:"http_config"`
-	HTTPServer    *HTTPServer `yaml:"http_server,omitempty" mapstructure:"http_server"`
+	WaitInterval  int          `yaml:"wait_interval" mapstructure:"wait_interval"`
+	EncryptedKeys string       `yaml:"encrypted_keys" mapstructure:"encrypted_keys"`
+	Store         *StoreConfig `yaml:"store" mapstructure:"store"`
+	KubeConfig    *KubeConfig  `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
+	HTTPConfig    *HTTPConfig  `yaml:"http_config,omitempty" mapstructure:"http_config"`
+	HTTPServer    *HTTPServer  `yaml:"http_server,omitempty" mapstructure:"http_server"`
 }
 
 // HTTPServer holds HTTP server configuration for health checks.
@@ -58,4 +63,40 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// StoreConfig holds configuration for secret store.
+type StoreConfig struct {
+	Type   string                 `yaml:"type" mapstructure:"type"`
+	Config map[string]interface{} `yaml:"config,omitempty" mapstructure:"config"`
+}
+
+// CreateStore creates a store interface based on the configuration.
+func (c *Config) CreateStore() (storePkg.SecretStoreInteface, error) {
+	if c.Store == nil {
+		return nil, fmt.Errorf("store configuration is required")
+	}
+
+	switch c.Store.Type {
+	case "env":
+		return storePkg.NewEnvStore()
+	case "file":
+		path, ok := c.Store.Config["path"].(string)
+		if !ok {
+			return nil, fmt.Errorf("file store requires 'path' configuration")
+		}
+		return storePkg.NewFileSecretStore(path)
+	case "kube":
+		secretName, ok := c.Store.Config["secret_name"].(string)
+		if !ok {
+			return nil, fmt.Errorf("kube store requires 'secret_name' configuration")
+		}
+		secretNamespace, ok := c.Store.Config["secret_namespace"].(string)
+		if !ok {
+			return nil, fmt.Errorf("kube store requires 'secret_namespace' configuration")
+		}
+		return storePkg.NewKubeStore(secretName, secretNamespace)
+	default:
+		return nil, fmt.Errorf("unknown store type: %s", c.Store.Type)
+	}
 }

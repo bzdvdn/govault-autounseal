@@ -1,0 +1,20 @@
+wait_interval: 30
+encrypted_keys: "your-encrypted-keys-here"
+
+store:
+  type: kube
+  config:
+    secret_name: vault-secrets
+    secret_namespace: vault
+
+kube_config:
+  vault_namespace: vault
+  vault_label_selector: app=vault
+  vault_pod_port: 8200
+  pod_scan_max_counter: 10
+  pod_scan_delay: 5
+  secret_name: vault-keys
+  secret_namespace: vault
+
+http_server:
+  port: 2310

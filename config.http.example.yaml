@@ -1,0 +1,15 @@
+wait_interval: 30
+encrypted_keys: "your-encrypted-keys-here"
+
+store:
+  type: env
+
+http_config:
+  vault_urls:
+    - "https://vault1.example.com:8200"
+    - "https://vault2.example.com:8200"
+  secret_key: "your-secret-key"
+  secret_salt: "your-secret-salt"
+
+http_server:
+  port: 2310

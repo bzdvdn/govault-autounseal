@@ -7,10 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	store "govault-autounseal/src/internal/store"
+	storePkg "govault-autounseal/src/internal/store"
 	"govault-autounseal/src/internal/vault"
 	"govault-autounseal/src/pkg/crypter"
 	"govault-autounseal/src/pkg/utils"
-	"govault-autounseal/src/secrets"
 	"net/http"
 	"time"
 
@@ -30,8 +31,7 @@ type KubernetesWorker struct {
 	podScanMaxCounter  int
 	podScanDelay       int
 	waitInterval       int
-	secretName         string
-	secretNamespace    string
+	store              storePkg.SecretStoreInteface
 	EncryptedKeys      string
 	vaultPodPort       int
 }
@@ -43,8 +43,7 @@ func NewKubernetesWorker(
 	podScanMaxCounter int,
 	podScanDelay int,
 	waitInterval int,
-	secretName string,
-	secretNamespace string,
+	store store.SecretStoreInteface,
 	EncryptedKeys string,
 	vaultPodPort int,
 ) *KubernetesWorker {
@@ -66,8 +65,7 @@ func NewKubernetesWorker(
 		podScanMaxCounter:  podScanMaxCounter,
 		podScanDelay:       podScanDelay,
 		waitInterval:       waitInterval,
-		secretName:         secretName,
-		secretNamespace:    secretNamespace,
+		store:              store,
 		EncryptedKeys:      EncryptedKeys,
 		vaultPodPort:       vaultPodPort,
 	}
@@ -114,38 +112,32 @@ func (k *KubernetesWorker) getVaultPodNames() ([]string, error) {
 	return nil, fmt.Errorf("max pod scan counter reached")
 }
 
-// loadKeysFromSecret loads and decrypts the unseal keys from the configured Kubernetes secret.
-func (k *KubernetesWorker) loadKeysFromSecret() error {
-	secret, err := k.clientset.CoreV1().Secrets(k.secretNamespace).Get(context.TODO(), k.secretName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get secret %s/%s: %v", k.secretNamespace, k.secretName, err)
+// loadKeysFromStore loads and decrypts the unseal keys from the configured store.
+func (k *KubernetesWorker) loadKeysFromStore() error {
+	if err := k.store.Load(); err != nil {
+		return fmt.Errorf("failed to load store: %v", err)
 	}
 
-	secretKey, ok := secret.Data["secret-key"]
-	if !ok {
-		return fmt.Errorf("secret-key key not found in secret %s/%s", k.secretNamespace, k.secretName)
-	}
-	secretSalt, ok := secret.Data["secret-salt"]
-	if !ok {
-		return fmt.Errorf("secret-salt key not found in secret %s/%s", k.secretNamespace, k.secretName)
-	}
-	crypter := crypter.NewCrypter(string(secretSalt))
-	decryptedKeys, err := crypter.Decrypt(k.EncryptedKeys, string(secretKey))
+	secretKey := k.store.SecretKey()
+	secretSalt := k.store.SecretSalt()
+
+	crypter := crypter.NewCrypter(secretSalt)
+	decryptedKeys, err := crypter.Decrypt(k.EncryptedKeys, secretKey)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt keys: %v", err)
 	}
 
-	var secretData secrets.EncryptedData
-	if err := secretData.Unmarshal([]byte(decryptedKeys)); err != nil {
+	var encryptKeys vault.EncryptedData
+	if err := encryptKeys.Unmarshal([]byte(decryptedKeys)); err != nil {
 		// Try to unmarshal as old format (array of strings)
 		var unsealKeys []string
 		if err2 := json.Unmarshal([]byte(decryptedKeys), &unsealKeys); err2 != nil {
 			return fmt.Errorf("failed to parse decrypted keys: %v", err)
 		}
-		secretData.Keys = unsealKeys
+		encryptKeys.Keys = unsealKeys
 	}
 
-	k.unsealKeys = secretData.Keys
+	k.unsealKeys = encryptKeys.Keys
 	return nil
 }
 
@@ -184,9 +176,9 @@ func (k *KubernetesWorker) getTLSConfigFromKubeconfig() (*tls.Config, error) {
 
 // Start begins the Kubernetes worker's unsealing loop, continuously checking and unsealing Vault pods.
 func (k *KubernetesWorker) Start() {
-	// Load keys from secret on startup
-	if err := k.loadKeysFromSecret(); err != nil {
-		logrus.Fatalf("Failed to load keys from secret: %v", err)
+	// Load keys from store on startup
+	if err := k.loadKeysFromStore(); err != nil {
+		logrus.Fatalf("Failed to load keys from store: %v", err)
 	}
 
 	for {
