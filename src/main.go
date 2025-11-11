@@ -236,10 +236,10 @@ func init() {
 
 	createSecretDataCmd.Flags().String("secret-key", "", "Secret key for encryption")
 	createSecretDataCmd.Flags().String("secret-salt", "", "Secret salt for encryption")
-	createSecretDataCmd.Flags().String("config", "", "Path to config file")
+
 	decryptSecretDataCmd.Flags().String("secret-key", "", "Secret key for decryption")
 	decryptSecretDataCmd.Flags().String("secret-salt", "", "Secret salt for decryption")
-	decryptSecretDataCmd.Flags().String("config", "", "Path to config file")
+
 	startCmd.Flags().String("config", "", "Path to config file")
 }
 
