@@ -34,18 +34,16 @@ type HTTPServer struct {
 type KubeConfig struct {
 	VaultNamespace     string `yaml:"vault_namespace" mapstructure:"vault_namespace"`
 	VaultLabelSelector string `yaml:"vault_label_selector" mapstructure:"vault_label_selector"`
+	VaultPodPort       int    `yaml:"vault_pod_port" mapstructure:"vault_pod_port"`
 	PodScanMaxCounter  int    `yaml:"pod_scan_max_counter" mapstructure:"pod_scan_max_counter"`
 	PodScanDelay       int    `yaml:"pod_scan_delay" mapstructure:"pod_scan_delay"`
 	SecretName         string `yaml:"secret_name" mapstructure:"secret_name"`
 	SecretNamespace    string `yaml:"secret_namespace" mapstructure:"secret_namespace"`
-	VaultPodPort       int    `yaml:"vault_pod_port" mapstructure:"vault_pod_port"`
 }
 
 // HTTPConfig holds HTTP-specific configuration for Vault unsealing.
 type HTTPConfig struct {
 	VaultURLs  []string `yaml:"vault_urls" mapstructure:"vault_urls"`
-	Username   *string  `yaml:"username,omitempty" mapstructure:"username"`
-	Password   *string  `yaml:"password,omitempty" mapstructure:"password"`
 	SecretKey  string   `yaml:"secret_key" mapstructure:"secret_key"`
 	SecretSalt string   `yaml:"secret_salt" mapstructure:"secret_salt"`
 }
@@ -109,8 +107,8 @@ var createSecretDataCmd = &cobra.Command{
 			keysStr[i] = k.(string)
 		}
 
-		secretData := secrets.SecretData{Keys: keysStr}
-		keysJson, err := secretData.Marshal()
+		encryptedData := secrets.EncryptedData{Keys: keysStr}
+		keysJson, err := encryptedData.Marshal()
 		if err != nil {
 			log.Fatalf("Failed to marshal data: %v", err)
 		}
@@ -137,16 +135,16 @@ var decryptSecretDataCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Failed to decrypt: %v", err)
 		}
-		var secretData secrets.SecretData
-		if err := secretData.Unmarshal([]byte(decrypted)); err != nil {
+		var encryptedData secrets.EncryptedData
+		if err := encryptedData.Unmarshal([]byte(decrypted)); err != nil {
 			// Try to unmarshal as old format (array of strings)
 			var keys []string
 			if err2 := json.Unmarshal([]byte(decrypted), &keys); err2 != nil {
 				log.Fatalf("Failed to unmarshal decrypted data: %v", err)
 			}
-			secretData.Keys = keys
+			encryptedData.Keys = keys
 		}
-		keysJson, err := json.Marshal(secretData)
+		keysJson, err := json.Marshal(encryptedData)
 		if err != nil {
 			log.Fatalf("Failed to marshal keys: %v", err)
 		}
@@ -213,8 +211,8 @@ var startCmd = &cobra.Command{
 				log.Fatalf("Failed to decrypt encrypted keys: %v", err)
 			}
 
-			var secretData secrets.SecretData
-			if err := secretData.Unmarshal([]byte(decrypted)); err != nil {
+			var encryptedData secrets.EncryptedData
+			if err := encryptedData.Unmarshal([]byte(decrypted)); err != nil {
 				log.Fatalf("Failed to unmarshal decrypted keys: %v", err)
 			}
 
@@ -222,7 +220,7 @@ var startCmd = &cobra.Command{
 				config.HTTPConfig.VaultURLs,
 				config.WaitInterval,
 			)
-			worker.Start(secretData.Keys)
+			worker.Start(encryptedData.Keys)
 		} else {
 			log.Fatalf("No worker configuration found")
 		}

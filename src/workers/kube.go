@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"govault-autounseal/src/crypter"
 	"govault-autounseal/src/secrets"
+	"govault-autounseal/src/utils"
 	"govault-autounseal/src/vault"
 	"net/http"
 	"time"
@@ -16,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // KubernetesWorker handles Vault unsealing via direct pod IP connections.
@@ -47,7 +47,7 @@ func NewKubernetesWorker(
 	EncryptedKeys string,
 	vaultPodPort int,
 ) *KubernetesWorker {
-	config, err := loadKubeConfig()
+	config, err := utils.LoadKubeConfig()
 	if err != nil {
 		logrus.Fatalf("Failed to load kube config: %v", err)
 	}
@@ -70,41 +70,6 @@ func NewKubernetesWorker(
 		EncryptedKeys:      EncryptedKeys,
 		vaultPodPort:       vaultPodPort,
 	}
-}
-
-// loadKubeConfig loads Kubernetes configuration from in-cluster or external kubeconfig file.
-func loadKubeConfig() (*rest.Config, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		logrus.Warnf("Failed to load in-cluster config: %v", err)
-		kubeconfig := clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename()
-		logrus.Infof("Trying external kubeconfig: %s", kubeconfig)
-
-		// Load the kubeconfig and get the current context
-		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig},
-			&clientcmd.ConfigOverrides{},
-		)
-
-		rawConfig, err := clientConfig.RawConfig()
-		if err != nil {
-			logrus.Errorf("Failed to load raw kubeconfig: %v", err)
-			return nil, err
-		}
-
-		currentContext := rawConfig.CurrentContext
-		logrus.Infof("Current kubeconfig context: %s", currentContext)
-
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			logrus.Errorf("Failed to load external kubeconfig: %v", err)
-			return nil, err
-		}
-		logrus.Info("Successfully loaded external kubeconfig")
-	} else {
-		logrus.Info("Successfully loaded in-cluster config")
-	}
-	return config, nil
 }
 
 // getVaultPodNames retrieves the list of Vault pod Names based on the configured label selector.
@@ -169,7 +134,7 @@ func (k *KubernetesWorker) loadKeysFromSecret() error {
 		return fmt.Errorf("failed to decrypt keys: %v", err)
 	}
 
-	var secretData secrets.SecretData
+	var secretData secrets.EncryptedData
 	if err := secretData.Unmarshal([]byte(decryptedKeys)); err != nil {
 		// Try to unmarshal as old format (array of strings)
 		var unsealKeys []string
