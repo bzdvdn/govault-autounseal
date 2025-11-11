@@ -1,7 +1,8 @@
 package workers
 
 import (
-	"govault-autounseal/src/vault"
+	"govault-autounseal/src/internal/vault"
+
 	"time"
 )
 

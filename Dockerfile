@@ -17,7 +17,7 @@ RUN go mod download
 COPY src/ ./src/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o govault-autounseal ./src
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o govault-autounseal ./src/cmd/cli
 
 # Final stage
 FROM alpine:latest

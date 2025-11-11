@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"os"
 
-	"govault-autounseal/src/crypter"
+	"govault-autounseal/src/internal/workers"
+	"govault-autounseal/src/pkg/crypter"
 	"govault-autounseal/src/secrets"
-	"govault-autounseal/src/workers"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

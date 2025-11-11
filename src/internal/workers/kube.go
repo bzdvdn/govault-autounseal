@@ -6,10 +6,11 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"govault-autounseal/src/crypter"
+
+	"govault-autounseal/src/internal/vault"
+	"govault-autounseal/src/pkg/crypter"
+	"govault-autounseal/src/pkg/utils"
 	"govault-autounseal/src/secrets"
-	"govault-autounseal/src/utils"
-	"govault-autounseal/src/vault"
 	"net/http"
 	"time"
 
