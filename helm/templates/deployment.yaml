@@ -17,6 +17,32 @@ spec:
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "govault-autounseal.serviceAccountName" . }}
       {{- end }}
+      {{- if .Values.initContainer.enabled }}
+      initContainers:
+      - name: init
+        image: "{{ .Values.initContainer.image.repository }}:{{ .Values.initContainer.image.tag }}"
+        imagePullPolicy: {{ .Values.initContainer.image.pullPolicy }}
+        {{- if .Values.initContainer.command }}
+        command:
+          {{- toYaml .Values.initContainer.command | nindent 12 }}
+        {{- end }}
+        {{- if .Values.initContainer.args }}
+        args:
+          {{- toYaml .Values.initContainer.args | nindent 12 }}
+        {{- end }}
+        {{- if .Values.initContainer.env }}
+        env:
+          {{- toYaml .Values.initContainer.env | nindent 12 }}
+        {{- end }}
+        {{- if .Values.initContainer.volumeMounts }}
+        volumeMounts:
+          {{- toYaml .Values.initContainer.volumeMounts | nindent 12 }}
+        {{- end }}
+        {{- if .Values.initContainer.resources }}
+        resources:
+          {{- toYaml .Values.initContainer.resources | nindent 12 }}
+        {{- end }}
+      {{- end }}
       containers:
       - name: govault-autounseal
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -24,11 +50,16 @@ spec:
         command: ["start", "--config", "/config/config.yaml"]
         ports:
         - name: http
-          containerPort: {{ .Values.config.http_server.port }}
+          containerPort: {{ .Values.config.httpServer.port }}
           protocol: TCP
         volumeMounts:
         - name: config
           mountPath: /config
+        {{ if .Values.config.store.env -}}
+          envFrom:
+            - secretRef:
+                name: {{ include "govault-autounseal.fullname" . }}-env
+          {{ end -}}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
       volumes:

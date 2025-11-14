@@ -44,9 +44,8 @@ export KEYS_B64=$(base64 -w 0 keys.json)
 # Install the chart
 helm install govault-autounseal ./helm \
   --set config.encrypted_keys="$(cat encrypted-keys)" \
-  --set encryptionSecret.enabled=true \
-  --set encryptionSecret.secretKey="$SECRET_KEY" \
-  --set encryptionSecret.secretSalt="$SECRET_SALT" \
+  --set config.store.env.VA_SECRET_KEY="$SECRET_KEY" \
+  --set config.store.env.VA_SECRET_SALT="$SECRET_SALT" \
   --namespace vault
 ```
 
@@ -55,11 +54,11 @@ helm install govault-autounseal ./helm \
 ```bash
 # Install the chart
 helm install govault-autounseal ./helm \
-  --set mode="http" \
+  --set config.mode="http" \
   --set config.encrypted_keys="your-encrypted-keys" \
-  --set httpConfig.vault_urls[0]="https://vault.example.com:8200" \
-  --set httpConfig.secret_key="your-secret-key" \
-  --set httpConfig.secret_salt="your-salt-16-chars" \
+  --set config.store.env.VA_SECRET_KEY="your-secret-key" \
+  --set config.store.env.VA_SECRET_SALT="your-salt-16-chars" \
+  --set config.httpConfig.vault_urls[0]="https://vault.example.com:8200" \
   --namespace vault
 ```
 
@@ -83,14 +82,30 @@ The following table lists the configurable parameters of the govault-autounseal 
 | `image.repository` | Image repository | `govault-autounseal` |
 | `image.tag` | Image tag | `latest` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `initContainer.enabled` | Enable init container | `false` |
+| `initContainer.image.repository` | Init container image repository | `busybox` |
+| `initContainer.image.tag` | Init container image tag | `1.36` |
+| `initContainer.image.pullPolicy` | Init container image pull policy | `IfNotPresent` |
+| `initContainer.command` | Init container command | `[]` |
+| `initContainer.args` | Init container arguments | `[]` |
+| `initContainer.env` | Init container environment variables | `[]` |
+| `initContainer.volumeMounts` | Init container volume mounts | `[]` |
+| `initContainer.resources` | Init container resource limits | `{}` |
 | `config.wait_interval` | Interval between checks (seconds) | `30` |
 | `config.encrypted_keys` | Encrypted unseal keys (required) | `""` |
-| `config.http_server.port` | Health check server port | `2310` |
-| `mode` | Operation mode: "kube" or "http" | `"kube"` |
-| `encryptionSecret.enabled` | Enable encryption secret creation | `false` |
-| `encryptionSecret.secretKey` | Secret key for encryption | `"your-secret-key"` |
-| `encryptionSecret.secretSalt` | Salt for encryption (16 chars) | `"your-salt-16-chars"` |
-| `kubeConfig.vault_namespace` | Namespace where Vault pods run | `"vault"` |
+| `config.httpServer.port` | Health check server port | `2310` |
+| `config.mode` | Operation mode: "kube" or "http" | `"kube"` |
+| `config.store.env.enabled` | Enable environment variables store | `true` |
+| `config.store.env.VA_SECRET_KEY` | Secret key for encryption | `""` |
+| `config.store.env.VA_SECRET_SALT` | Salt for encryption (16 chars) | `""` |
+| `config.store.file.enabled` | Enable file store | `false` |
+| `config.store.file.path` | Path to secrets file | `"/etc/vault/secrets.yaml"` |
+| `config.store.kube.enabled` | Enable Kubernetes secret store | `false` |
+| `config.store.kube.secret_name` | Name of the secret | `"vault-secrets"` |
+| `config.store.kube.secret_namespace` | Namespace of the secret | `"vault"` |
+| `config.store.kube.secret_key` | Base64 encoded secret key | `"your-secret-key"` |
+| `config.store.kube.secret_salt` | Base64 encoded secret salt | `"your-secret-salt"` |
+| `config.kubeConfig.vault_namespace` | Namespace where Vault pods run | `"vault"` |
 | `kubeConfig.vault_label_selector` | Label selector for Vault pods | `"app.kubernetes.io/name=vault"` |
 | `kubeConfig.pod_scan_max_counter` | Max pod scan attempts | `5` |
 | `kubeConfig.pod_scan_delay` | Delay between pod scans (seconds) | `30` |
@@ -134,31 +149,54 @@ Before installing the chart, you need to generate encrypted unseal keys:
 
 ```yaml
 # values.yaml
-mode: "kube"
 config:
+  mode: "kube"
   encrypted_keys: "VFZ2UjZ6dzZybnpEUmtTQ2FncyBsbUl5eDRkaCtCdlpaOWZtWF8tZ1NRQ254YXAzSldPcTdtR0IrTzNqOFNoNk5YclRM-RUZGK2k0RTgzLV8tMnJLWVdPbFJSQmtnOFNNS0VhMExvbHhTdkRjRXJuUU9ieDlVMzJFU2EzVExTNjhuTmhmSVZYdXVBOGwzVkxMSnp1MmtEY3krSHZpMnQwSWNkQmVfRjZXRGRiS3VRVm5fc1E2bVpSb3o2K1NobzRqemRkSEIyQ25PQl8tMmVfLXJlU2VaRHJ6U1BtWVl6SXlNUWVkazJDemUrUHl1aXg0ZXRRY295ZU15ZHZFY2Y4STJlUlVYenY2b3RzMmhoOEFKb3lrYTFZY3h5NnJQZk1Nd1pGK0ZjaXJmR1ZkczlyOUtPUDByejRSa2VXOEJxRXcrY3U2VEJV"  # Replace with your encrypted keys
-encryptionSecret:
-  enabled: true
-  secretKey: "your-actual-secret-key"
-  secretSalt: "your-16-char-salt"
-kubeConfig:
-  vault_namespace: "vault-system"
-  vault_label_selector: "app.kubernetes.io/name=vault"
+  store:
+    env:
+      VA_SECRET_KEY: "your-actual-secret-key"
+      VA_SECRET_SALT: "your-16-char-salt"
+  kubeConfig:
+    vault_namespace: "vault-system"
+    vault_label_selector: "app.kubernetes.io/name=vault"
 ```
 
 ### HTTP Mode
 
 ```yaml
 # values.yaml
-mode: "http"
 config:
+  mode: "http"
   encrypted_keys: "VFZ2UjZ6dzZybnpEUmtTQ2FncyBsbUl5eDRkaCtCdlpaOWZtWF8tZ1NRQ254YXAzSldPcTdtR0IrTzNqOFNoNk5YclRM-RUZGK2k0RTgzLV8tMnJLWVdPbFJSQmtnOFNNS0VhMExvbHhTdkRjRXJuUU9ieDlVMzJFU2EzVExTNjhuTmhmSVZYdXVBOGwzVkxMSnp1MmtEY3krSHZpMnQwSWNkQmVfRjZXRGRiS3VRVm5fc1E2bVpSb3o2K1NobzRqemRkSEIyQ25PQl8tMmVfLXJlU2VaRHJ6U1BtWVl6SXlNUWVkazJDemUrUHl1aXg0ZXRRY295ZU15ZHZFY2Y4STJlUlVYenY2b3RzMmhoOEFKb3lrYTFZY3h5NnJQZk1Nd1pGK0ZjaXJmR1ZkczlyOUtPUDByejRSa2VXOEJxRXcrY3U2VEJV"  # Replace with your encrypted keys
-httpConfig:
-  vault_urls:
-    - "https://vault-1.example.com:8200"
-    - "https://vault-2.example.com:8200"
-  secret_key: "your-actual-secret-key"
-  secret_salt: "your-16-char-salt"
+  store:
+    env:
+      VA_SECRET_KEY: "your-actual-secret-key"
+      VA_SECRET_SALT: "your-16-char-salt"
+  httpConfig:
+    vault_urls:
+      - "https://vault-1.example.com:8200"
+      - "https://vault-2.example.com:8200"
+```
+
+### With Init Container
+
+```yaml
+# values.yaml
+initContainer:
+ enabled: true
+ image:
+   repository: busybox
+   tag: "1.36"
+ command: ["sh", "-c"]
+ args: ["echo 'Waiting for Vault...' && sleep 10"]
+ resources:
+   requests:
+     cpu: 10m
+     memory: 16Mi
+   limits:
+     cpu: 50m
+     memory: 32Mi
+# ... rest of configuration
 ```
 
 ## Health Checks

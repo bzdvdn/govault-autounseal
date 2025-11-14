@@ -8,27 +8,36 @@ data:
   config.yaml: |
     wait_interval: {{ .Values.config.wait_interval }}
     encrypted_keys: {{ .Values.config.encrypted_keys | quote }}
+    {{- if .Values.config.store.env.enabled }}
+    store:
+      env: {}
+    {{- else if .Values.config.store.file.enabled }}
+    store:
+      file:
+        path: {{ .Values.config.store.file.path | quote }}
+    {{- else if .Values.config.store.kube.enabled }}
+    store:
+      kube:
+        secret_name: {{ .Values.config.store.kube.secret_name | quote }}
+        secret_namespace: {{ .Values.config.store.kube.secret_namespace | quote }}
+    {{- end }}
     http_server:
-      port: {{ .Values.config.http_server.port }}
-    {{- if eq .Values.mode "kube" }}
+      port: {{ .Values.config.httpServer.port }}
+    {{- if eq .Values.config.mode "kube" }}
     kube_config:
-      vault_namespace: {{ .Values.kubeConfig.vault_namespace | quote }}
-      vault_label_selector: {{ .Values.kubeConfig.vault_label_selector | quote }}
-      pod_scan_max_counter: {{ .Values.kubeConfig.pod_scan_max_counter }}
-      pod_scan_delay: {{ .Values.kubeConfig.pod_scan_delay }}
-      {{- if .Values.encryptionSecret.enabled }}
-      secret_name: {{ include "govault-autounseal.fullname" . }}-keys
-      {{- else }}
-      secret_name: {{ .Values.kubeConfig.secret_name }}
-      {{- end }}
+      vault_namespace: {{ .Values.config.kubeConfig.vault_namespace | quote }}
+      vault_label_selector: {{ .Values.config.kubeConfig.vault_label_selector | quote }}
+      pod_scan_max_counter: {{ .Values.config.kubeConfig.pod_scan_max_counter }}
+      pod_scan_delay: {{ .Values.config.kubeConfig.pod_scan_delay }}
+      secret_name: {{ .Values.config.kubeConfig.secret_name }}
       secret_namespace: {{ .Release.Namespace | quote }}
-      vault_pod_port: {{ .Values.kubeConfig.vault_pod_port }}
-    {{- else if eq .Values.mode "http" }}
+      vault_pod_port: {{ .Values.config.kubeConfig.vault_pod_port }}
+    {{- else if eq .Values.config.mode "http" }}
     http_config:
       vault_urls:
-      {{- range .Values.httpConfig.vault_urls }}
+      {{- range .Values.config.httpConfig.vault_urls }}
         - {{ . | quote }}
       {{- end }}
-      secret_key: {{ .Values.httpConfig.secret_key | quote }}
-      secret_salt: {{ .Values.httpConfig.secret_salt | quote }}
+      secret_key: {{ .Values.config.httpConfig.secret_key | quote }}
+      secret_salt: {{ .Values.config.httpConfig.secret_salt | quote }}
     {{- end }}

@@ -8,40 +8,72 @@ fullnameOverride: ""
 replicaCount: 1
 
 image:
-  repository: govault-autounseal
+  repository: bzdvdn/govault-autounseal
   tag: "latest"
   pullPolicy: IfNotPresent
+
+# Init container configuration
+initContainer:
+  enabled: false
+  image:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+  command: []
+  args: []
+  env: []
+  volumeMounts: []
+  resources: {}
 
 # Application configuration
 config:
   wait_interval: 30
   encrypted_keys: "" #required
-  http_server:
+
+  # Store configuration - choose one store type
+  store:
+    # Environment variables store
+    env:
+      enabled: true
+      VA_SECRET_KEY: ""
+      VA_SECRET_SALT: ""
+
+    # File store (alternative to env)
+    file:
+      enabled: false
+      path: "/etc/vault/secrets.yaml"
+
+    # Kubernetes secret store (alternative to env)
+    kube:
+      enabled: false
+      existingSecret: "" # existing secret name
+      secret_name: "vault-secrets"
+      secret_namespace: "vault"
+      secret_key: "your-secret-key" # base64 encoded
+      secret_salt: "your-secret-salt" # base64 encoded
+
+  # HTTP server configuration
+  httpServer:
     port: 2310
 
-# Mode: "kube" or "http"
-mode: "kube"
+  # Mode: "kube" or "http"
+  mode: "kube"
 
-encryptionSecret:
-  enabled: false
-  secretKey: "your-secret-key"
-  secretSalt: "your-salt-16-chars"
+  # Kubernetes mode configuration
+  kubeConfig:
+    vault_namespace: "vault"
+    vault_label_selector: "app.kubernetes.io/name=vault"
+    pod_scan_max_counter: 5
+    pod_scan_delay: 30
+    secret_name: "vault-unseal-keys"
+    secret_namespace: "vault"
+    vault_pod_port: 8200
 
-# Kubernetes mode configuration
-kubeConfig:
-  vault_namespace: "vault"
-  vault_label_selector: "app.kubernetes.io/name=vault"
-  pod_scan_max_counter: 5
-  pod_scan_delay: 30
-  secret_name: "vault-unseal-keys"
-  secret_namespace: "vault"
-  vault_pod_port: 8200
-
-# HTTP mode configuration
-httpConfig:
-  vault_urls: []
-  secret_key: "change-this-key"
-  secret_salt: "change-this-salt-16-chars"
+  # HTTP mode configuration
+  httpConfig:
+    vault_urls: []
+    secret_key: "change-this-key"
+    secret_salt: "change-this-salt-16-chars"
 
 # Service account
 serviceAccount:
