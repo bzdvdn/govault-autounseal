@@ -21,7 +21,7 @@ data:
         secret_name: {{ .Values.config.store.kube.secret_name | quote }}
         secret_namespace: {{ .Values.config.store.kube.secret_namespace | quote }}
     {{- end }}
-    http_server:
+    server:
       port: {{ .Values.config.httpServer.port }}
     {{- if eq .Values.config.mode "kube" }}
     kube_config:

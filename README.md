@@ -87,7 +87,7 @@ kube_config:
   pod_scan_max_counter: 10
   pod_scan_delay: 5
 
-http_server:
+server:
   port: 2310
 ```
 
@@ -104,7 +104,7 @@ http_config:
     - "https://vault1.example.com:8200"
     - "https://vault2.example.com:8200"
 
-http_server:
+server:
   port: 2310
 ```
 

@@ -53,7 +53,7 @@ config:
       secret_salt: "your-secret-salt" # base64 encoded
 
   # HTTP server configuration
-  httpServer:
+  server:
     port: 2310
 
   # Mode: "kube" or "http"

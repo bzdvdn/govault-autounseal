@@ -15,7 +15,7 @@ type Config struct {
 	Store         *StoreConfig `yaml:"store" mapstructure:"store"`
 	KubeConfig    *KubeConfig  `yaml:"kube_config,omitempty" mapstructure:"kube_config"`
 	HTTPConfig    *HTTPConfig  `yaml:"http_config,omitempty" mapstructure:"http_config"`
-	HTTPServer    *HTTPServer  `yaml:"http_server,omitempty" mapstructure:"http_server"`
+	HTTPServer    *HTTPServer  `yaml:"server,omitempty" mapstructure:"server"`
 }
 
 // HTTPServer holds HTTP server configuration for health checks.
